@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Azure.Devices.Client" Version="1.19.3-amqp-redesign-preview" />
+    <PackageReference Include="Microsoft.Azure.Devices.Client" Version="1.19.4-amqp-redesign-preview" />
   </ItemGroup>
 
   <ItemGroup>
