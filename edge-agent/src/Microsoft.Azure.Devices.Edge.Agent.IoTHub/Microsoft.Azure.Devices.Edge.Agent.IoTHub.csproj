@@ -21,7 +21,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Azure.Devices" Version="1.17.1" />
-    <PackageReference Include="Microsoft.Azure.Devices.Client" Version="1.19.4-amqp-redesign-preview" />
+    <PackageReference Include="Microsoft.Azure.Devices.Client" Version="1.19.2-preview-amqp-001" />
   </ItemGroup>
 
   <ItemGroup>
