@@ -15,8 +15,10 @@ use url::Url;
 
 use dps::registration::{DpsAuthKind, DpsClient, DpsTokenSource};
 use edgelet_core::crypto::{Activate, KeyIdentity, KeyStore, MemoryKey, MemoryKeyStore};
+use edgelet_hosting::hosting::{ExternalKeyStore};
 use edgelet_hsm::tpm::{TpmKey, TpmKeyStore};
 use edgelet_http::client::{Client as HttpClient, ClientImpl};
+use edgelet_http_hosting::hosting::{HostingClient};
 use edgelet_utils::log_failure;
 use hsm::TpmKey as HsmTpmKey;
 use log::Level;
@@ -96,6 +98,48 @@ impl Provision for ManualProvisioning {
                 reconfigure: false,
             })
             .map_err(|err| Error::from(err.context(ErrorKind::Provision)));
+        Box::new(result.into_future())
+    }
+}
+
+pub struct ExternalProvisioning
+{
+    client: HostingClient,
+//    hosting_environment_endpoint: String,
+}
+
+impl ExternalProvisioning
+{
+    pub fn new(client: HostingClient) -> Self {
+        ExternalProvisioning {
+            client,
+        }
+    }
+}
+
+impl Provision for ExternalProvisioning
+{
+    type Hsm = ExternalKeyStore;
+
+    fn provision(
+        self,
+        key_activator: Self::Hsm,
+    ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send> {
+        let result =
+                self.client.get_device_connection_information()
+                    .map(|(device_id, hub_name)| {
+                        info!(
+                            "External device registration information: Device \"{}\" in hub \"{}\"",
+                            device_id, hub_name
+                        );
+                        ProvisioningResult {
+                            device_id,
+                            hub_name,
+                            reconfigure: false,
+                        }
+                    })
+                    .map_err(|err| Error::from(err.context(ErrorKind::Provision)));
+
         Box::new(result.into_future())
     }
 }

@@ -84,6 +84,7 @@ pub enum InitializeErrorReason {
     DeviceClient,
     DpsProvisioningClient,
     EdgeRuntime,
+    ExternalHostingClient,
     Hsm,
     HttpClient,
     InvalidProxyUri,

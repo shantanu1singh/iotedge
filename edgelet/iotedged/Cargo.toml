@@ -27,8 +27,10 @@ docker = { path = "../docker-rs" }
 edgelet-config = { path = "../edgelet-config" }
 edgelet-core = { path = "../edgelet-core" }
 edgelet-docker = { path = "../edgelet-docker" }
+edgelet-hosting = { path = "../edgelet-hosting" }
 edgelet-hsm = { path = "../edgelet-hsm" }
 edgelet-http = { path = "../edgelet-http" }
+edgelet-http-hosting = { path = "../edgelet-http-hosting" }
 edgelet-http-mgmt = { path = "../edgelet-http-mgmt" }
 edgelet-http-workload = { path = "../edgelet-http-workload" }
 edgelet-iothub = { path = "../edgelet-iothub" }

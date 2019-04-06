@@ -4,28 +4,25 @@ use std::fmt;
 use std::fmt::Display;
 
 use failure::{Backtrace, Context, Fail};
+use hosting::Error as HostingError;
 
 #[derive(Debug)]
 pub struct Error {
     inner: Context<ErrorKind>,
 }
 
-#[derive(Clone, Copy, Debug, Fail)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Fail)]
 pub enum ErrorKind {
-    #[fail(display = "Could not backup provisioning result")]
-    CouldNotBackup,
-
-    #[fail(display = "Could not restore previous provisioning result")]
-    CouldNotRestore,
-
-    #[fail(display = "Could not initialize DPS provisioning client")]
-    DpsInitialization,
-
-    #[fail(display = "Could not provision device")]
-    Provision,
-
-    #[fail(display = "Could not initialize Hosting client")]
-    HostingInitialization,
+    #[fail(display = "HostingClient failure")]
+    HostingClient,
+    #[fail(display = "Hosting system not enabled")]
+    HostingNotEnabled,
+    #[fail(display = "X509 system not enabled")]
+    X509NotEnabled,
+    #[fail(display = "Empty strings are not allowed")]
+    EmptyStrings,
+    #[fail(display = "Only Device keys are allowed to be activated")]
+    NoModuleActivation,
 }
 
 impl Fail for Error {
@@ -45,6 +42,10 @@ impl Display for Error {
 }
 
 impl Error {
+    pub fn new(inner: Context<ErrorKind>) -> Self {
+        Error { inner }
+    }
+
     pub fn kind(&self) -> &ErrorKind {
         self.inner.get_context()
     }
@@ -61,5 +62,13 @@ impl From<ErrorKind> for Error {
 impl From<Context<ErrorKind>> for Error {
     fn from(inner: Context<ErrorKind>) -> Self {
         Error { inner }
+    }
+}
+
+impl From<HostingError> for Error {
+    fn from(error: HostingError) -> Self {
+        Error {
+            inner: error.context(ErrorKind::HostingClient),
+        }
     }
 }

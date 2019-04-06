@@ -394,6 +394,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "edgelet-hosting"
+version = "0.1.0"
+dependencies = [
+ "base64 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bytes 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chrono 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "edgelet-core 0.1.0",
+ "edgelet-http-hosting 0.1.0",
+ "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hmac 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sha2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "edgelet-hsm"
 version = "0.1.0"
 dependencies = [
@@ -449,6 +463,22 @@ dependencies = [
  "typed-headers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "edgelet-http-hosting"
+version = "0.1.0"
+dependencies = [
+ "edgelet-core 0.1.0",
+ "edgelet-http 0.1.0",
+ "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hyper 0.12.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.84 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.43 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "url 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -920,8 +950,10 @@ dependencies = [
  "edgelet-config 0.1.0",
  "edgelet-core 0.1.0",
  "edgelet-docker 0.1.0",
+ "edgelet-hosting 0.1.0",
  "edgelet-hsm 0.1.0",
  "edgelet-http 0.1.0",
+ "edgelet-http-hosting 0.1.0",
  "edgelet-http-mgmt 0.1.0",
  "edgelet-http-workload 0.1.0",
  "edgelet-iothub 0.1.0",
@@ -1368,8 +1400,10 @@ dependencies = [
  "dps 0.1.0",
  "edgelet-config 0.1.0",
  "edgelet-core 0.1.0",
+ "edgelet-hosting 0.1.0",
  "edgelet-hsm 0.1.0",
  "edgelet-http 0.1.0",
+ "edgelet-http-hosting 0.1.0",
  "edgelet-utils 0.1.0",
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.24 (registry+https://github.com/rust-lang/crates.io-index)",

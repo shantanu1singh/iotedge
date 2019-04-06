@@ -37,6 +37,9 @@ const DEFAULT_NETWORKID: &str = "azure-iot-edge";
 /// This is the default connection string
 pub const DEFAULT_CONNECTION_STRING: &str = "<ADD DEVICE CONNECTION STRING HERE>";
 
+/// This is the default hosting environment endpoint
+pub const DEFAULT_HOSTING_ENVIRONMENT: &str = "<ADD DEVICE HOSTING ENVIRONMENT HERE>";
+
 #[cfg(unix)]
 const DEFAULTS: &str = include_str!("../config/unix/default.yaml");
 
@@ -157,11 +160,31 @@ impl Dps {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub struct External {
+    #[serde(with = "url_serde")]
+    hosting_environment_endpoint: Url,
+}
+
+impl External {
+    pub fn new(hosting_environment_endpoint: Url) -> Self {
+        External {
+            hosting_environment_endpoint,
+        }
+    }
+
+    pub fn hosting_environment_endpoint(&self) -> &Url {
+        &self.hosting_environment_endpoint
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "source")]
 #[serde(rename_all = "lowercase")]
 pub enum Provisioning {
     Manual(Manual),
     Dps(Dps),
+    External(External),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
