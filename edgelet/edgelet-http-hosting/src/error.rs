@@ -7,7 +7,7 @@ use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::{Body, Response, StatusCode};
 use log::error;
 use serde_json;
-use workload::models::ErrorResponse;
+use crate::models::ErrorResponse;
 
 use crate::IntoResponse;
 
@@ -23,11 +23,17 @@ pub enum ErrorKind {
     #[fail(display = "Certificate has an invalid private key")]
     BadPrivateKey,
 
-    #[fail(display = "{}", _0)]
-    CertOperation(CertOperation),
+//    #[fail(display = "{}", _0)]
+//    CertOperation(CertOperation),
+//
+//    #[fail(display = "{}", _0)]
+//    EncryptionOperation(EncryptionOperation),
 
-    #[fail(display = "{}", _0)]
-    EncryptionOperation(EncryptionOperation),
+    #[fail(display = "Could not get device connection info")]
+    GetDeviceConnectionInformation,
+
+    #[fail(display = "The initialization of hosting client failed")]
+    HostingClientInitializationFailure,
 
     #[fail(display = "Request body is malformed")]
     MalformedRequestBody,

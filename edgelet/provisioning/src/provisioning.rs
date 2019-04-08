@@ -18,7 +18,7 @@ use edgelet_core::crypto::{Activate, KeyIdentity, KeyStore, MemoryKey, MemoryKey
 use edgelet_hosting::hosting::{ExternalKeyStore};
 use edgelet_hsm::tpm::{TpmKey, TpmKeyStore};
 use edgelet_http::client::{Client as HttpClient, ClientImpl};
-use edgelet_http_hosting::hosting::{HostingClient};
+use edgelet_http_hosting::{HostingClient, HostingInterface};
 use edgelet_utils::log_failure;
 use hsm::TpmKey as HsmTpmKey;
 use log::Level;
@@ -102,39 +102,46 @@ impl Provision for ManualProvisioning {
     }
 }
 
-pub struct ExternalProvisioning
+pub struct ExternalProvisioning<C>
+    where
+        C: 'static + ClientImpl,
 {
-    client: HostingClient,
+    client: &'static HostingClient<C>,
 //    hosting_environment_endpoint: String,
 }
 
-impl ExternalProvisioning
+impl<C> ExternalProvisioning<C>
+    where
+        C: ClientImpl + Clone,
 {
-    pub fn new(client: HostingClient) -> Self {
+    pub fn new(client: &'static HostingClient<C>) -> Self {
         ExternalProvisioning {
             client,
         }
     }
 }
 
-impl Provision for ExternalProvisioning
+impl<C> Provision for ExternalProvisioning<C>
+    where
+        C: 'static + ClientImpl + Clone,
 {
-    type Hsm = ExternalKeyStore;
+    type Hsm = ExternalKeyStore<C>;
 
     fn provision(
         self,
-        key_activator: Self::Hsm,
+        _key_activator: Self::Hsm,
     ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send> {
         let result =
                 self.client.get_device_connection_information()
-                    .map(|(device_id, hub_name)| {
+                    .map(|device_connection_info| {
                         info!(
                             "External device registration information: Device \"{}\" in hub \"{}\"",
-                            device_id, hub_name
+                            device_connection_info.device_id(), device_connection_info.hub_id()
                         );
+
                         ProvisioningResult {
-                            device_id,
-                            hub_name,
+                            device_id: device_connection_info.device_id().to_string(),
+                            hub_name: device_connection_info.hub_id().to_string(),
                             reconfigure: false,
                         }
                     })

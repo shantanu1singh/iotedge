@@ -6,6 +6,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+chrono = { version = "0.4", features = ["serde"] }
 failure = "0.1.2"
 futures = "0.1"
 hyper = "0.12"

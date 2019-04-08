@@ -7,10 +7,10 @@
 use hyper::{Body, Response};
 
 pub mod client;
-mod error;
-mod models;
+pub mod error;
+pub mod models;
 
-pub use client::hosting::HostingClient;
+pub use client::{HostingClient, HostingInterface};
 pub use error::{Error, ErrorKind};
 pub use models::*;
 

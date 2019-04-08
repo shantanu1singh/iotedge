@@ -4,7 +4,6 @@ use std::fmt;
 use std::fmt::Display;
 
 use failure::{Backtrace, Context, Fail};
-use hosting::Error as HostingError;
 
 #[derive(Debug)]
 pub struct Error {
@@ -62,13 +61,5 @@ impl From<ErrorKind> for Error {
 impl From<Context<ErrorKind>> for Error {
     fn from(inner: Context<ErrorKind>) -> Self {
         Error { inner }
-    }
-}
-
-impl From<HostingError> for Error {
-    fn from(error: HostingError) -> Self {
-        Error {
-            inner: error.context(ErrorKind::HostingClient),
-        }
     }
 }

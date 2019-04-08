@@ -5,10 +5,10 @@
 #![allow(clippy::module_name_repetitions, clippy::use_self)]
 
 //mod certificate_properties;
-mod crypto;
+//mod crypto;
 mod error;
 pub mod hosting;
 
-pub use crypto::{Certificate, Crypto};
+//pub use crypto::{Certificate, Crypto};
 pub use error::{Error, ErrorKind};
-pub use hosting::{HostingKey, HostingKeyStore};
+pub use hosting::{ExternalKey, ExternalKeyStore};

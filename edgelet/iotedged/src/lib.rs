@@ -43,7 +43,7 @@ use docker::models::HostConfig;
 use dps::DPS_API_VERSION;
 use edgelet_config::{
     Dps, Manual, External, Provisioning, Settings, DEFAULT_CONNECTION_STRING,
-    DEFAULT_HOSTING_ENVIRONMENT
+//    DEFAULT_HOSTING_ENVIRONMENT
 };
 use edgelet_core::crypto::{
     Activate, CreateCertificate, Decrypt, DerivedKeyStore, Encrypt, GetTrustBundle, KeyIdentity,
@@ -62,7 +62,7 @@ use edgelet_http::certificate_manager::CertificateManager;
 use edgelet_http::client::{Client as HttpClient, ClientImpl};
 use edgelet_http::logging::LoggingService;
 use edgelet_http::{HyperExt, MaybeProxyClient, API_VERSION};
-use edgelet_http_hosting::hosting::{HostingClient};
+use edgelet_http_hosting::{HostingClient};
 use edgelet_http_mgmt::ManagementService;
 use edgelet_http_workload::WorkloadService;
 use edgelet_iothub::{HubIdentityManager, SasTokenSource};
@@ -271,8 +271,8 @@ impl Main {
             }
             Provisioning::External(external) => {
                 let hosting_client = HostingClient::new(
-                    hyper_client,
-                    provisioning.hosting_environment_endpoint().clone(),
+                    hyper_client.clone(),
+                    external.hosting_environment_endpoint().clone(),
                     "".to_string(),
                 ).context(ErrorKind::Initialize(
                     InitializeErrorReason::ExternalHostingClient,
@@ -664,12 +664,12 @@ fn manual_provision(
 }
 
 fn external_provision<HC>(
-    provisioning: &External,
-    hosting_client: &HostingClient,
+    _provisioning: &External,
+    hosting_client: &'static HostingClient<HC>,
     tokio_runtime: &mut tokio::runtime::Runtime,
-) -> Result<(DerivedKeyStore<ExternalKey>, ProvisioningResult, ExternalKey), Error>
+) -> Result<(DerivedKeyStore<ExternalKey<HC>>, ProvisioningResult, ExternalKey<HC>), Error>
     where
-        HC: 'static + ClientImpl,
+        HC: 'static + ClientImpl + Clone,
 {
     /*let client = HostingClient::new(
         hyper_client,
@@ -679,17 +679,17 @@ fn external_provision<HC>(
         InitializeErrorReason::ExternalProvisioningClient,
     ))?; // Figure out API version later. Is it needed?*/
 
-    let external = ExternalProvisioning::new(hosting_client)?;
+    let external = ExternalProvisioning::new(hosting_client);
     let external_hsm = ExternalKeyStore::from_hosting_environment(hosting_client)
         .context(ErrorKind::Initialize(
-            InitializeErrorReason::ExternalProvisioningClient,
+            InitializeErrorReason::ExternalHostingClient,
         ))?;
 
     let provision = external
         .provision(external_hsm.clone())
         .map_err(|err| {
             Error::from(err.context(ErrorKind::Initialize(
-                InitializeErrorReason::ExternalProvisioningClient,
+                InitializeErrorReason::ExternalHostingClient,
             )))
         })
         .and_then(move |prov_result| {
@@ -697,7 +697,7 @@ fn external_provision<HC>(
                 .get(&KeyIdentity::Device, "primary")
                 .map_err(|err| {
                     Error::from(err.context(ErrorKind::Initialize(
-                        InitializeErrorReason::ExternalProvisioningClient,
+                        InitializeErrorReason::ExternalHostingClient,
                     )))
                 })
                 .and_then(|k| {
