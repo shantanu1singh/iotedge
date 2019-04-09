@@ -102,30 +102,30 @@ impl Provision for ManualProvisioning {
     }
 }
 
-pub struct ExternalProvisioning<C>
+pub struct ExternalProvisioning<'a, C>
     where
         C: 'static + ClientImpl,
 {
-    client: &'static HostingClient<C>,
+    client: &'a HostingClient<C>,
 //    hosting_environment_endpoint: String,
 }
 
-impl<C> ExternalProvisioning<C>
+impl<'a, C> ExternalProvisioning<'a, C>
     where
         C: ClientImpl + Clone,
 {
-    pub fn new(client: &'static HostingClient<C>) -> Self {
+    pub fn new(client: &'a HostingClient<C>) -> Self {
         ExternalProvisioning {
             client,
         }
     }
 }
 
-impl<C> Provision for ExternalProvisioning<C>
+impl<'a, C> Provision for ExternalProvisioning<'a, C>
     where
-        C: 'static + ClientImpl + Clone,
+        C: 'a + ClientImpl + Clone,
 {
-    type Hsm = ExternalKeyStore<C>;
+    type Hsm = ExternalKeyStore<'a, C>;
 
     fn provision(
         self,

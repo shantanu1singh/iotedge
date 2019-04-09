@@ -663,11 +663,11 @@ fn manual_provision(
     tokio_runtime.block_on(provision)
 }
 
-fn external_provision<HC>(
+fn external_provision<'a, HC>(
     _provisioning: &External,
-    hosting_client: &'static HostingClient<HC>,
+    hosting_client: &'a HostingClient<HC>,
     tokio_runtime: &mut tokio::runtime::Runtime,
-) -> Result<(DerivedKeyStore<ExternalKey<HC>>, ProvisioningResult, ExternalKey<HC>), Error>
+) -> Result<(DerivedKeyStore<ExternalKey<'a, HC>>, ProvisioningResult, ExternalKey<'a, HC>), Error>
     where
         HC: 'static + ClientImpl + Clone,
 {
