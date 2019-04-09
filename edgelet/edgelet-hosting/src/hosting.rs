@@ -23,7 +23,7 @@ pub struct ExternalKey<C>
         C: 'static + ClientImpl + Clone,
 {
     #[allow(dead_code)]
-    hosting: Arc<Mutex<&'static HostingClient<C>>>,
+    hosting: Arc<Mutex<HostingClient<C>>>,
     #[allow(dead_code)]
     identity: KeyIdentity,
     #[allow(dead_code)]
@@ -39,7 +39,7 @@ impl<C> ExternalKeyStore<C>
 //        ExternalKeyStore::from_hosting_environment(hsm)
 //    }
 
-    pub fn from_hosting_environment(hosting: &'static HostingClient<C>) -> Result<Self, Error> {
+    pub fn from_hosting_environment(hosting: HostingClient<C>) -> Result<Self, Error> {
         Ok(ExternalKeyStore {
             hosting: Arc::new(Mutex::new(hosting)),
         })
@@ -71,7 +71,7 @@ pub struct ExternalKeyStore<C>
     where
         C: 'static + ClientImpl + Clone,
 {
-    hosting: Arc<Mutex<&'static HostingClient<C>>>,
+    hosting: Arc<Mutex<HostingClient<C>>>,
 }
 
 impl<C> CoreKeyStore for ExternalKeyStore<C>

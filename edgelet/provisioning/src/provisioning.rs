@@ -106,7 +106,7 @@ pub struct ExternalProvisioning<C>
     where
         C: 'static + ClientImpl,
 {
-    client: &'static HostingClient<C>,
+    client: HostingClient<C>,
 //    hosting_environment_endpoint: String,
 }
 
@@ -114,7 +114,7 @@ impl<C> ExternalProvisioning<C>
     where
         C: ClientImpl + Clone,
 {
-    pub fn new(client: &'static HostingClient<C>) -> Self {
+    pub fn new(client: HostingClient<C>) -> Self {
         ExternalProvisioning {
             client,
         }

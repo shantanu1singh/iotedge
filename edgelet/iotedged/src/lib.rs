@@ -280,7 +280,7 @@ impl Main {
 
                 let (key_store, provisioning_result, root_key) =
                     external_provision(&external,
-                                       &hosting_client,
+                                       hosting_client,
                                        &mut tokio_runtime)?;
 
                 info!("Finished external provisioning edge device.");
@@ -665,7 +665,7 @@ fn manual_provision(
 
 fn external_provision<HC>(
     _provisioning: &External,
-    hosting_client: &'static HostingClient<HC>,
+    hosting_client: HostingClient<HC>,
     tokio_runtime: &mut tokio::runtime::Runtime,
 ) -> Result<(DerivedKeyStore<ExternalKey<HC>>, ProvisioningResult, ExternalKey<HC>), Error>
     where
@@ -679,7 +679,7 @@ fn external_provision<HC>(
         InitializeErrorReason::ExternalProvisioningClient,
     ))?; // Figure out API version later. Is it needed?*/
 
-    let external = ExternalProvisioning::new(hosting_client);
+    let external = ExternalProvisioning::new(hosting_client.clone());
     let external_hsm = ExternalKeyStore::from_hosting_environment(hosting_client)
         .context(ErrorKind::Initialize(
             InitializeErrorReason::ExternalHostingClient,
