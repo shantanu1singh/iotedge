@@ -18,19 +18,19 @@ const ROOT_KEY_NAME: &str = "primary";
 
 /// Represents a key which can sign data.
 #[derive(Clone)]
-pub struct ExternalKey<'a, C>
+pub struct ExternalKey<C>
     where
         C: 'static + ClientImpl + Clone,
 {
     #[allow(dead_code)]
-    hosting: Arc<Mutex<&'a HostingClient<C>>>,
+    hosting: Arc<Mutex<&'static HostingClient<C>>>,
     #[allow(dead_code)]
     identity: KeyIdentity,
     #[allow(dead_code)]
     key_name: String,
 }
 
-impl<'a, C> ExternalKeyStore<'a, C>
+impl<C> ExternalKeyStore<C>
     where
         C: 'static +  ClientImpl + Clone,
 {
@@ -39,7 +39,7 @@ impl<'a, C> ExternalKeyStore<'a, C>
 //        ExternalKeyStore::from_hosting_environment(hsm)
 //    }
 
-    pub fn from_hosting_environment(hosting: &'a HostingClient<C>) -> Result<Self, Error> {
+    pub fn from_hosting_environment(hosting: &'static HostingClient<C>) -> Result<Self, Error> {
         Ok(ExternalKeyStore {
             hosting: Arc::new(Mutex::new(hosting)),
         })
@@ -55,7 +55,7 @@ impl<'a, C> ExternalKeyStore<'a, C>
     }
 
     /// Get a ExternalKey which will sign data.
-    pub fn get_active_key(&self) -> Result<ExternalKey<'a, C>, Error> {
+    pub fn get_active_key(&self) -> Result<ExternalKey<C>, Error> {
         Ok(ExternalKey {
             hosting: Arc::clone(&self.hosting),
             identity: KeyIdentity::Device,
@@ -67,18 +67,18 @@ impl<'a, C> ExternalKeyStore<'a, C>
 /// The External Key Store.
 /// Activate a private key, and then you can use that key to sign data.
 #[derive(Clone)]
-pub struct ExternalKeyStore<'a, C>
+pub struct ExternalKeyStore<C>
     where
         C: 'static + ClientImpl + Clone,
 {
-    hosting: Arc<Mutex<&'a HostingClient<C>>>,
+    hosting: Arc<Mutex<&'static HostingClient<C>>>,
 }
 
-impl<'a, C> CoreKeyStore for ExternalKeyStore<'a, C>
+impl<C> CoreKeyStore for ExternalKeyStore<C>
     where
 C: 'static + ClientImpl + Clone,
 {
-    type Key = ExternalKey<'a, C>;
+    type Key = ExternalKey<C>;
 
     /// Get a key which will derive and sign data.
     fn get(&self, identity: &KeyIdentity, key_name: &str) -> Result<Self::Key, CoreError> {
@@ -102,11 +102,11 @@ C: 'static + ClientImpl + Clone,
     }
 }
 
-impl<'a, C> Activate for ExternalKeyStore<'a, C>
+impl<C> Activate for ExternalKeyStore<C>
     where
         C: 'static + ClientImpl + Clone,
 {
-    type Key = ExternalKey<'a, C>;
+    type Key = ExternalKey<C>;
 
     fn activate_identity_key<B: AsRef<[u8]>>(
         &mut self,
@@ -124,7 +124,7 @@ impl<'a, C> Activate for ExternalKeyStore<'a, C>
     }
 }
 
-impl<'a, C> Sign for ExternalKey<'a, C>
+impl<C> Sign for ExternalKey<C>
     where
         C: 'static +  ClientImpl + Clone,
 {
