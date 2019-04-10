@@ -8,9 +8,9 @@ use failure::Fail;
 use edgelet_core::crypto::{
     Activate, KeyIdentity, KeyStore as CoreKeyStore, Sign, SignatureAlgorithm,
 };
-use edgelet_core::{Error as CoreError, ErrorKind as CoreErrorKind, Digest as ExternalDigest};
-use edgelet_http_hosting::{HostingClient};
-use edgelet_http::client::{ClientImpl};
+use edgelet_core::{Digest as ExternalDigest, Error as CoreError, ErrorKind as CoreErrorKind};
+use edgelet_http::client::ClientImpl;
+use edgelet_http_hosting::HostingClient;
 
 pub use crate::error::{Error, ErrorKind};
 
@@ -19,8 +19,8 @@ const ROOT_KEY_NAME: &str = "primary";
 /// Represents a key which can sign data.
 #[derive(Clone)]
 pub struct ExternalKey<C>
-    where
-        C: 'static + ClientImpl + Clone,
+where
+    C: 'static + ClientImpl + Clone,
 {
     #[allow(dead_code)]
     hosting: Arc<Mutex<HostingClient<C>>>,
@@ -31,13 +31,13 @@ pub struct ExternalKey<C>
 }
 
 impl<C> ExternalKeyStore<C>
-    where
-        C: 'static +  ClientImpl + Clone,
+where
+    C: 'static + ClientImpl + Clone,
 {
-//    pub fn new() -> Result<Self, Error> {
-//        let hsm = HostingClient::new()?;
-//        ExternalKeyStore::from_hosting_environment(hsm)
-//    }
+    //    pub fn new() -> Result<Self, Error> {
+    //        let hsm = HostingClient::new()?;
+    //        ExternalKeyStore::from_hosting_environment(hsm)
+    //    }
 
     pub fn from_hosting_environment(hosting: HostingClient<C>) -> Result<Self, Error> {
         Ok(ExternalKeyStore {
@@ -47,10 +47,10 @@ impl<C> ExternalKeyStore<C>
 
     /// Activate and store a private key in the external key store.
     pub fn activate_key(&self, _key_value: &Bytes) -> Result<(), Error> {
-//        self.hosting
-//            .lock()
-//            .expect("Lock on KeyStore TPM failed")
-//            .activate_identity_key(key_value)?;
+        //        self.hosting
+        //            .lock()
+        //            .expect("Lock on KeyStore TPM failed")
+        //            .activate_identity_key(key_value)?;
         Ok(())
     }
 
@@ -68,15 +68,15 @@ impl<C> ExternalKeyStore<C>
 /// Activate a private key, and then you can use that key to sign data.
 #[derive(Clone)]
 pub struct ExternalKeyStore<C>
-    where
-        C: 'static + ClientImpl + Clone,
+where
+    C: 'static + ClientImpl + Clone,
 {
     hosting: Arc<Mutex<HostingClient<C>>>,
 }
 
 impl<C> CoreKeyStore for ExternalKeyStore<C>
-    where
-C: 'static + ClientImpl + Clone,
+where
+    C: 'static + ClientImpl + Clone,
 {
     type Key = ExternalKey<C>;
 
@@ -103,8 +103,8 @@ C: 'static + ClientImpl + Clone,
 }
 
 impl<C> Activate for ExternalKeyStore<C>
-    where
-        C: 'static + ClientImpl + Clone,
+where
+    C: 'static + ClientImpl + Clone,
 {
     type Key = ExternalKey<C>;
 
@@ -125,8 +125,8 @@ impl<C> Activate for ExternalKeyStore<C>
 }
 
 impl<C> Sign for ExternalKey<C>
-    where
-        C: 'static +  ClientImpl + Clone,
+where
+    C: 'static + ClientImpl + Clone,
 {
     type Signature = ExternalDigest;
 
@@ -140,32 +140,32 @@ impl<C> Sign for ExternalKey<C>
     ) -> Result<Self::Signature, CoreError> {
         Ok(ExternalDigest::new(Bytes::from("abc")))
 
-//        match self.identity {
-//            KeyIdentity::Device => self
-//                .hosting
-//                .lock()
-//                .expect("Lock failed")
-//                .sign_with_identity(data)
-//                .map_err(|err| Error::from(err.context(ErrorKind::HostingClient)))
-//                .map_err(|err| CoreError::from(err.context(CoreErrorKind::KeyStore))),
-//            KeyIdentity::Module(ref _m) => self
-//                .hosting
-//                .lock()
-//                .expect("Lock failed")
-//                .derive_and_sign_with_identity(
-//                    data,
-//                    format!(
-//                        "{}{}",
-//                        match self.identity {
-//                            KeyIdentity::Device => "",
-//                            KeyIdentity::Module(ref m) => m,
-//                        },
-//                        self.key_name
-//                    )
-//                        .as_bytes(),
-//                )
-//                .map_err(|err| Error::from(err.context(ErrorKind::HostingClient)))
-//                .map_err(|err| CoreError::from(err.context(CoreErrorKind::KeyStore))),
-//        }
+        //        match self.identity {
+        //            KeyIdentity::Device => self
+        //                .hosting
+        //                .lock()
+        //                .expect("Lock failed")
+        //                .sign_with_identity(data)
+        //                .map_err(|err| Error::from(err.context(ErrorKind::HostingClient)))
+        //                .map_err(|err| CoreError::from(err.context(CoreErrorKind::KeyStore))),
+        //            KeyIdentity::Module(ref _m) => self
+        //                .hosting
+        //                .lock()
+        //                .expect("Lock failed")
+        //                .derive_and_sign_with_identity(
+        //                    data,
+        //                    format!(
+        //                        "{}{}",
+        //                        match self.identity {
+        //                            KeyIdentity::Device => "",
+        //                            KeyIdentity::Module(ref m) => m,
+        //                        },
+        //                        self.key_name
+        //                    )
+        //                        .as_bytes(),
+        //                )
+        //                .map_err(|err| Error::from(err.context(ErrorKind::HostingClient)))
+        //                .map_err(|err| CoreError::from(err.context(CoreErrorKind::KeyStore))),
+        //        }
     }
 }

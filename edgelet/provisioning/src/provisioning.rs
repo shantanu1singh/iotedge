@@ -15,7 +15,7 @@ use url::Url;
 
 use dps::registration::{DpsAuthKind, DpsClient, DpsTokenSource};
 use edgelet_core::crypto::{Activate, KeyIdentity, KeyStore, MemoryKey, MemoryKeyStore};
-use edgelet_hosting::hosting::{ExternalKeyStore};
+use edgelet_hosting::hosting::ExternalKeyStore;
 use edgelet_hsm::tpm::{TpmKey, TpmKeyStore};
 use edgelet_http::client::{Client as HttpClient, ClientImpl};
 use edgelet_http_hosting::{HostingClient, HostingInterface};
@@ -103,27 +103,25 @@ impl Provision for ManualProvisioning {
 }
 
 pub struct ExternalProvisioning<C>
-    where
-        C: 'static + ClientImpl,
+where
+    C: 'static + ClientImpl,
 {
     client: HostingClient<C>,
-//    hosting_environment_endpoint: String,
+    //    hosting_environment_endpoint: String,
 }
 
 impl<C> ExternalProvisioning<C>
-    where
-        C: ClientImpl + Clone,
+where
+    C: ClientImpl + Clone,
 {
     pub fn new(client: HostingClient<C>) -> Self {
-        ExternalProvisioning {
-            client,
-        }
+        ExternalProvisioning { client }
     }
 }
 
 impl<C> Provision for ExternalProvisioning<C>
-    where
-        C: 'static + ClientImpl + Clone,
+where
+    C: 'static + ClientImpl + Clone,
 {
     type Hsm = ExternalKeyStore<C>;
 
@@ -131,21 +129,23 @@ impl<C> Provision for ExternalProvisioning<C>
         self,
         _key_activator: Self::Hsm,
     ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send> {
-        let result =
-                self.client.get_device_connection_information()
-                    .map(|device_connection_info| {
-                        info!(
-                            "External device registration information: Device \"{}\" in hub \"{}\"",
-                            device_connection_info.device_id(), device_connection_info.hub_id()
-                        );
+        let result = self
+            .client
+            .get_device_connection_information()
+            .map(|device_connection_info| {
+                info!(
+                    "External device registration information: Device \"{}\" in hub \"{}\"",
+                    device_connection_info.device_id(),
+                    device_connection_info.hub_id()
+                );
 
-                        ProvisioningResult {
-                            device_id: device_connection_info.device_id().to_string(),
-                            hub_name: device_connection_info.hub_id().to_string(),
-                            reconfigure: false,
-                        }
-                    })
-                    .map_err(|err| Error::from(err.context(ErrorKind::Provision)));
+                ProvisioningResult {
+                    device_id: device_connection_info.device_id().to_string(),
+                    hub_name: device_connection_info.hub_id().to_string(),
+                    reconfigure: false,
+                }
+            })
+            .map_err(|err| Error::from(err.context(ErrorKind::Provision)));
 
         Box::new(result.into_future())
     }

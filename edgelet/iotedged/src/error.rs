@@ -134,7 +134,7 @@ impl fmt::Display for InitializeErrorReason {
 
             InitializeErrorReason::ExternalHostingClient => {
                 write!(f, "Could not initialize external hosting client")
-            },
+            }
 
             InitializeErrorReason::Hsm => write!(f, "Could not initialize HSM"),
 

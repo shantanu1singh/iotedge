@@ -162,6 +162,9 @@ where
 
         // build the full url
         let path_query = format!("{}?{}", path, query);
+
+        println!("Host name {:?} ", self.host_name.clone());
+        println!("Query {:?} ", path_query);
         self.host_name
             .join(&path_query)
             .with_context(|_| ErrorKind::UrlJoin(self.host_name.clone(), path_query))

@@ -2,12 +2,12 @@
 
 use std::fmt::{self, Display};
 
+use crate::models::ErrorResponse;
 use failure::{Backtrace, Context, Fail};
 use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::{Body, Response, StatusCode};
 use log::error;
 use serde_json;
-use crate::models::ErrorResponse;
 
 use crate::IntoResponse;
 
@@ -23,12 +23,11 @@ pub enum ErrorKind {
     #[fail(display = "Certificate has an invalid private key")]
     BadPrivateKey,
 
-//    #[fail(display = "{}", _0)]
-//    CertOperation(CertOperation),
-//
-//    #[fail(display = "{}", _0)]
-//    EncryptionOperation(EncryptionOperation),
-
+    //    #[fail(display = "{}", _0)]
+    //    CertOperation(CertOperation),
+    //
+    //    #[fail(display = "{}", _0)]
+    //    EncryptionOperation(EncryptionOperation),
     #[fail(display = "Could not get device connection info")]
     GetDeviceConnectionInformation,
 

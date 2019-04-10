@@ -22,10 +22,7 @@ pub struct DeviceConnectionInfo {
 
 impl DeviceConnectionInfo {
     pub fn new(hub_id: String, device_id: String) -> Self {
-        DeviceConnectionInfo {
-            hub_id,
-            device_id,
-        }
+        DeviceConnectionInfo { hub_id, device_id }
     }
 
     pub fn set_hub_id(&mut self, hub_id: String) {

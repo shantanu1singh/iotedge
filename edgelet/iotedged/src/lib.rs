@@ -42,8 +42,13 @@ use url::Url;
 use docker::models::HostConfig;
 use dps::DPS_API_VERSION;
 use edgelet_config::{
-    Dps, Manual, External, Provisioning, Settings, DEFAULT_CONNECTION_STRING,
-//    DEFAULT_HOSTING_ENVIRONMENT
+    Dps,
+    External,
+    Manual,
+    Provisioning,
+    Settings,
+    DEFAULT_CONNECTION_STRING,
+    //    DEFAULT_HOSTING_ENVIRONMENT
 };
 use edgelet_core::crypto::{
     Activate, CreateCertificate, Decrypt, DerivedKeyStore, Encrypt, GetTrustBundle, KeyIdentity,
@@ -62,7 +67,7 @@ use edgelet_http::certificate_manager::CertificateManager;
 use edgelet_http::client::{Client as HttpClient, ClientImpl};
 use edgelet_http::logging::LoggingService;
 use edgelet_http::{HyperExt, MaybeProxyClient, API_VERSION};
-use edgelet_http_hosting::{HostingClient};
+use edgelet_http_hosting::HostingClient;
 use edgelet_http_mgmt::ManagementService;
 use edgelet_http_workload::WorkloadService;
 use edgelet_iothub::{HubIdentityManager, SasTokenSource};
@@ -70,8 +75,8 @@ use hsm::tpm::Tpm;
 use hsm::ManageTpmKeys;
 use iothubservice::DeviceClient;
 use provisioning::provisioning::{
-    BackupProvisioning, DpsProvisioning, DpsSymmetricKeyProvisioning, ManualProvisioning,
-    ExternalProvisioning, Provision, ProvisioningResult,
+    BackupProvisioning, DpsProvisioning, DpsSymmetricKeyProvisioning, ExternalProvisioning,
+    ManualProvisioning, Provision, ProvisioningResult,
 };
 
 use crate::workload::WorkloadData;
@@ -273,15 +278,14 @@ impl Main {
                 let hosting_client = HostingClient::new(
                     hyper_client.clone(),
                     external.hosting_environment_endpoint().clone(),
-                    "".to_string(),
-                ).context(ErrorKind::Initialize(
+                    "1.0".to_string(),
+                )
+                .context(ErrorKind::Initialize(
                     InitializeErrorReason::ExternalHostingClient,
                 ))?; // Figure out API version later. Is it needed?
 
                 let (key_store, provisioning_result, root_key) =
-                    external_provision(&external,
-                                       hosting_client,
-                                       &mut tokio_runtime)?;
+                    external_provision(&external, hosting_client, &mut tokio_runtime)?;
 
                 info!("Finished external provisioning edge device.");
                 let cfg = WorkloadData::new(
@@ -667,9 +671,16 @@ fn external_provision<HC>(
     _provisioning: &External,
     hosting_client: HostingClient<HC>,
     tokio_runtime: &mut tokio::runtime::Runtime,
-) -> Result<(DerivedKeyStore<ExternalKey<HC>>, ProvisioningResult, ExternalKey<HC>), Error>
-    where
-        HC: 'static + ClientImpl + Clone,
+) -> Result<
+    (
+        DerivedKeyStore<ExternalKey<HC>>,
+        ProvisioningResult,
+        ExternalKey<HC>,
+    ),
+    Error,
+>
+where
+    HC: 'static + ClientImpl + Clone,
 {
     /*let client = HostingClient::new(
         hyper_client,
@@ -680,10 +691,9 @@ fn external_provision<HC>(
     ))?; // Figure out API version later. Is it needed?*/
 
     let external = ExternalProvisioning::new(hosting_client.clone());
-    let external_hsm = ExternalKeyStore::from_hosting_environment(hosting_client)
-        .context(ErrorKind::Initialize(
-            InitializeErrorReason::ExternalHostingClient,
-        ))?;
+    let external_hsm = ExternalKeyStore::from_hosting_environment(hosting_client).context(
+        ErrorKind::Initialize(InitializeErrorReason::ExternalHostingClient),
+    )?;
 
     let provision = external
         .provision(external_hsm.clone())
