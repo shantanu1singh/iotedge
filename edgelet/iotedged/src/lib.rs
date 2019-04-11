@@ -187,7 +187,7 @@ impl Main {
         }
 
         /*if let Provisioning::External(ref external) = settings.provisioning() {
-            if external.hosting_environment_endpoint() == DEFAULT_HOSTING_ENVIRONMENT {
+            if external.endpoint() == DEFAULT_HOSTING_ENVIRONMENT {
                 return Err(Error::from(ErrorKind::Initialize(
                     InitializeErrorReason::NotConfigured,
                 )));
@@ -276,7 +276,7 @@ impl Main {
             }
             Provisioning::External(external) => {
                 let hosting_client = HostingClient::new(
-                    external.hosting_environment_endpoint()
+                    external.endpoint()
                 )
                 .context(ErrorKind::Initialize(
                     InitializeErrorReason::ExternalHostingClient,
@@ -682,7 +682,7 @@ fn external_provision(
 {
     /*let client = HostingClient::new(
         hyper_client,
-        provisioning.hosting_environment_endpoint().clone(),
+        provisioning.endpoint().clone(),
         "".to_string(),
     ).context(ErrorKind::Initialize(
         InitializeErrorReason::ExternalProvisioningClient,

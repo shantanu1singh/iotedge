@@ -96,19 +96,19 @@ where
 {
     pub fn new(
         client_impl: C,
-        hosting_environment_endpoint: Url,
+        endpoint: Url,
         api_version: String,
     ) -> Result<Self, Error> {
         //        let endpoint = UrlConnector::build_hyper_uri(
-        //            hosting_environment_endpoint.scheme(),
-        //        hosting_environment_endpoint.path(),
+        //            endpoint.scheme(),
+        //        endpoint.path(),
         //        "").context(ErrorKind::HostingClientInitializationFailure)?;
 
         let http_client = HttpClient::new(
             client_impl,
             Some(HostingTokenSource),
             api_version,
-            hosting_environment_endpoint,
+            endpoint,
         )
         .context(ErrorKind::HostingClientInitializationFailure)?;
         Ok(HostingClient {

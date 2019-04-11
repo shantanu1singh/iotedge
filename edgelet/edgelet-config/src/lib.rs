@@ -163,18 +163,18 @@ impl Dps {
 #[serde(rename_all = "lowercase")]
 pub struct External {
     #[serde(with = "url_serde")]
-    hosting_environment_endpoint: Url,
+    endpoint: Url,
 }
 
 impl External {
-    pub fn new(hosting_environment_endpoint: Url) -> Self {
+    pub fn new(endpoint: Url) -> Self {
         External {
-            hosting_environment_endpoint,
+            endpoint,
         }
     }
 
-    pub fn hosting_environment_endpoint(&self) -> &Url {
-        &self.hosting_environment_endpoint
+    pub fn endpoint(&self) -> &Url {
+        &self.endpoint
     }
 }
 
