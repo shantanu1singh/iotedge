@@ -9,7 +9,10 @@ use hyper::{Body, Response, StatusCode};
 use log::error;
 use serde_json;
 
+use hosting::apis::Error as HostingError;
+
 use crate::IntoResponse;
+//use url::Host;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 
@@ -18,8 +21,12 @@ pub struct Error {
     inner: Context<ErrorKind>,
 }
 
-#[derive(Clone, Debug, Fail)]
+#[derive(Debug, Fail)]
 pub enum ErrorKind {
+    // Note: This errorkind is always wrapped in another errorkind context
+    #[fail(display = "Client error")]
+    Client(HostingError<serde_json::Value>),
+
     #[fail(display = "Certificate has an invalid private key")]
     BadPrivateKey,
 
@@ -33,6 +40,9 @@ pub enum ErrorKind {
 
     #[fail(display = "The initialization of hosting client failed")]
     HostingClientInitializationFailure,
+
+    #[fail(display = "Hosting client initialization")]
+    InitializeHostingClient,
 
     #[fail(display = "Request body is malformed")]
     MalformedRequestBody,
@@ -69,6 +79,14 @@ impl Display for Error {
 impl Error {
     pub fn kind(&self) -> &ErrorKind {
         self.inner.get_context()
+    }
+
+    pub fn from_hosting_error(error: HostingError<serde_json::Value>, context: ErrorKind) -> Self {
+        match error {
+            HostingError::Hyper(h) => Error::from(h.context(context)),
+            HostingError::Serde(s) => Error::from(s.context(context)),
+            HostingError::ApiError(_) => Error::from(ErrorKind::Client(error).context(context)),
+        }
     }
 }
 

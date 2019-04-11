@@ -23,3 +23,5 @@ impl IntoResponse for Response<Body> {
         self
     }
 }
+
+pub const HOSTING_API_VERSION: &str = "2019-04-10";

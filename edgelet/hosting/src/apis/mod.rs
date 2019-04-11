@@ -48,8 +48,6 @@ impl<T> From<serde_json::Error> for Error<T> {
     }
 }
 
-use super::models::*;
-
 mod hosting_api;
 pub use self::hosting_api::{HostingApi, HostingApiClient};
 

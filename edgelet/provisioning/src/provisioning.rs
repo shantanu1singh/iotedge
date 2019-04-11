@@ -102,28 +102,21 @@ impl Provision for ManualProvisioning {
     }
 }
 
-pub struct ExternalProvisioning<C>
-where
-    C: 'static + ClientImpl,
+pub struct ExternalProvisioning
 {
-    client: HostingClient<C>,
-    //    hosting_environment_endpoint: String,
+    client: HostingClient,
 }
 
-impl<C> ExternalProvisioning<C>
-where
-    C: ClientImpl + Clone,
+impl ExternalProvisioning
 {
-    pub fn new(client: HostingClient<C>) -> Self {
+    pub fn new(client: HostingClient) -> Self {
         ExternalProvisioning { client }
     }
 }
 
-impl<C> Provision for ExternalProvisioning<C>
-where
-    C: 'static + ClientImpl + Clone,
+impl Provision for ExternalProvisioning
 {
-    type Hsm = ExternalKeyStore<C>;
+    type Hsm = ExternalKeyStore;
 
     fn provision(
         self,
@@ -136,12 +129,12 @@ where
                 info!(
                     "External device registration information: Device \"{}\" in hub \"{}\"",
                     device_connection_info.device_id(),
-                    device_connection_info.hub_id()
+                    device_connection_info.hub_name()
                 );
 
                 ProvisioningResult {
                     device_id: device_connection_info.device_id().to_string(),
-                    hub_name: device_connection_info.hub_id().to_string(),
+                    hub_name: device_connection_info.hub_name().to_string(),
                     reconfigure: false,
                 }
             })

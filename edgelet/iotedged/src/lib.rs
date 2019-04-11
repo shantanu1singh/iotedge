@@ -276,13 +276,11 @@ impl Main {
             }
             Provisioning::External(external) => {
                 let hosting_client = HostingClient::new(
-                    hyper_client.clone(),
-                    external.hosting_environment_endpoint().clone(),
-                    "1.0".to_string(),
+                    external.hosting_environment_endpoint()
                 )
                 .context(ErrorKind::Initialize(
                     InitializeErrorReason::ExternalHostingClient,
-                ))?; // Figure out API version later. Is it needed?
+                ))?;
 
                 let (key_store, provisioning_result, root_key) =
                     external_provision(&external, hosting_client, &mut tokio_runtime)?;
@@ -667,20 +665,20 @@ fn manual_provision(
     tokio_runtime.block_on(provision)
 }
 
-fn external_provision<HC>(
+fn external_provision(
     _provisioning: &External,
-    hosting_client: HostingClient<HC>,
+    hosting_client: HostingClient,
     tokio_runtime: &mut tokio::runtime::Runtime,
 ) -> Result<
     (
-        DerivedKeyStore<ExternalKey<HC>>,
+        DerivedKeyStore<ExternalKey>,
         ProvisioningResult,
-        ExternalKey<HC>,
+        ExternalKey,
     ),
-    Error,
->
-where
-    HC: 'static + ClientImpl + Clone,
+    Error>
+//>
+//where
+//    HC: 'static + ClientImpl + Clone,
 {
     /*let client = HostingClient::new(
         hyper_client,

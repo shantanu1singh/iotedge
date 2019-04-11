@@ -9,7 +9,6 @@ use edgelet_core::crypto::{
     Activate, KeyIdentity, KeyStore as CoreKeyStore, Sign, SignatureAlgorithm,
 };
 use edgelet_core::{Digest as ExternalDigest, Error as CoreError, ErrorKind as CoreErrorKind};
-use edgelet_http::client::ClientImpl;
 use edgelet_http_hosting::HostingClient;
 
 pub use crate::error::{Error, ErrorKind};
@@ -18,28 +17,26 @@ const ROOT_KEY_NAME: &str = "primary";
 
 /// Represents a key which can sign data.
 #[derive(Clone)]
-pub struct ExternalKey<C>
-where
-    C: 'static + ClientImpl + Clone,
+pub struct ExternalKey
+//where
+//    C: 'static + ClientImpl + Clone,
 {
     #[allow(dead_code)]
-    hosting: Arc<Mutex<HostingClient<C>>>,
+    hosting: Arc<Mutex<HostingClient>>,
     #[allow(dead_code)]
     identity: KeyIdentity,
     #[allow(dead_code)]
     key_name: String,
 }
 
-impl<C> ExternalKeyStore<C>
-where
-    C: 'static + ClientImpl + Clone,
+impl ExternalKeyStore
 {
     //    pub fn new() -> Result<Self, Error> {
     //        let hsm = HostingClient::new()?;
     //        ExternalKeyStore::from_hosting_environment(hsm)
     //    }
 
-    pub fn from_hosting_environment(hosting: HostingClient<C>) -> Result<Self, Error> {
+    pub fn from_hosting_environment(hosting: HostingClient) -> Result<Self, Error> {
         Ok(ExternalKeyStore {
             hosting: Arc::new(Mutex::new(hosting)),
         })
@@ -55,7 +52,7 @@ where
     }
 
     /// Get a ExternalKey which will sign data.
-    pub fn get_active_key(&self) -> Result<ExternalKey<C>, Error> {
+    pub fn get_active_key(&self) -> Result<ExternalKey, Error> {
         Ok(ExternalKey {
             hosting: Arc::clone(&self.hosting),
             identity: KeyIdentity::Device,
@@ -67,18 +64,14 @@ where
 /// The External Key Store.
 /// Activate a private key, and then you can use that key to sign data.
 #[derive(Clone)]
-pub struct ExternalKeyStore<C>
-where
-    C: 'static + ClientImpl + Clone,
+pub struct ExternalKeyStore
 {
-    hosting: Arc<Mutex<HostingClient<C>>>,
+    hosting: Arc<Mutex<HostingClient>>,
 }
 
-impl<C> CoreKeyStore for ExternalKeyStore<C>
-where
-    C: 'static + ClientImpl + Clone,
+impl CoreKeyStore for ExternalKeyStore
 {
-    type Key = ExternalKey<C>;
+    type Key = ExternalKey;
 
     /// Get a key which will derive and sign data.
     fn get(&self, identity: &KeyIdentity, key_name: &str) -> Result<Self::Key, CoreError> {
@@ -102,11 +95,11 @@ where
     }
 }
 
-impl<C> Activate for ExternalKeyStore<C>
-where
-    C: 'static + ClientImpl + Clone,
+impl Activate for ExternalKeyStore
+//where
+//    C: 'static + ClientImpl + Clone,
 {
-    type Key = ExternalKey<C>;
+    type Key = ExternalKey;
 
     fn activate_identity_key<B: AsRef<[u8]>>(
         &mut self,
@@ -124,9 +117,9 @@ where
     }
 }
 
-impl<C> Sign for ExternalKey<C>
-where
-    C: 'static + ClientImpl + Clone,
+impl Sign for ExternalKey
+//where
+//    C: 'static + ClientImpl + Clone,
 {
     type Signature = ExternalDigest;
 
