@@ -53,8 +53,14 @@ pub enum ErrorKind {
     #[fail(display = "The request is missing required parameter `{}`", _0)]
     MissingRequiredParameter(&'static str),
 
+    #[fail(display = "Certificate has an invalid private key")]
+    MalformedResponse,
+
     #[fail(display = "Module not found")]
     ModuleNotFound(String),
+
+    #[fail(display = "Request to sign data failed")]
+    SignData,
 
     #[fail(display = "Could not start workload service")]
     StartService,

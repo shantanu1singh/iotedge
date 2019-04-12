@@ -5,6 +5,7 @@
 use std::sync::Arc;
 //use std::time::Duration;
 
+use bytes::Bytes;
 //use chrono::{DateTime, Utc};
 use failure::{Fail, ResultExt};
 //use futures::future::{self, FutureResult};
@@ -22,6 +23,7 @@ use edgelet_core::{UrlExt};
 use edgelet_http::{UrlConnector};
 
 use crate::error::{Error, ErrorKind};
+use edgelet_core::crypto::Signature;
 
 pub trait HostingInterface {
     type Error: Fail;
@@ -31,6 +33,8 @@ pub trait HostingInterface {
 
     type DeviceConnectionInformationFuture: Future<Item = DeviceConnectionInfo, Error = Self::Error>
     + Send;
+
+    type SignFuture: Future<Item = Option<Bytes>, Error = Self::Error> + Send;
     //    type Logs: Stream<Item = Self::Chunk, Error = Self::Error> + Send;
     //
     //    type CreateFuture: Future<Item = (), Error = Self::Error> + Send;
@@ -51,6 +55,8 @@ pub trait HostingInterface {
     //    type TopFuture: Future<Item = ModuleTop, Error = Self::Error> + Send;
 
     fn get_device_connection_information(&self) -> Self::DeviceConnectionInformationFuture;
+
+    fn sign(&self, identity: Option<&[u8]>, signing_algorithm: &str, data: &[u8]) -> Self::SignFuture;
     //    fn create(&self, module: ModuleSpec<Self::Config>) -> Self::CreateFuture;
     //    fn get(&self, id: &str) -> Self::GetFuture;
     //    fn start(&self, id: &str) -> Self::StartFuture;
@@ -129,12 +135,7 @@ impl HostingInterface for HostingClient {
     type DeviceConnectionInformationFuture =
     Box<dyn Future<Item = DeviceConnectionInfo, Error = Self::Error> + Send>;
 
-    //    type SignFuture = Box<dyn Future<Item = DeviceConnectionInfo, Error = Self::Error> + Send>;
-    //
-    //    type DeviceConnectionInformationFuture = Box<dyn Future<Item = DeviceConnectionInfo, Error = Self::Error> + Send>;
-    //    fn get_device_connection_information(&self) -> Self::SystemInfoFuture {
-    //        unimplemented!()
-    //    }
+    type SignFuture = Box<dyn Future<Item = Option<Bytes>, Error = Self::Error> + Send>;
 
     fn get_device_connection_information(&self) -> Self::DeviceConnectionInformationFuture {
         let connection_info = self
@@ -148,5 +149,37 @@ impl HostingInterface for HostingClient {
                 )
             });
         Box::new(connection_info)
+    }
+
+    fn sign(&self, identity: Option<&[u8]>, signing_algorithm: &str, data: &[u8]) -> Self::SignFuture {
+        let mut sign_request = SignRequest::new(signing_algorithm.to_string(), base64::encode(&data));
+
+        match identity {
+            None => {},
+            Some(s) => {
+                sign_request.set_identity(base64::encode(s));
+            }
+        };
+
+        println!("{:?}", sign_request);
+
+        let sign_response = self
+            .client
+            .hosting_api()
+            .sign(crate::HOSTING_API_VERSION, sign_request)
+            .map_err(|err| {
+                Error::from_hosting_error(
+                    err,
+                    ErrorKind::SignData,
+                )
+            })
+            .and_then(|sign_response| {
+                base64::decode(sign_response.digest())
+                    .and_then(|res|{
+                        Ok(Some(Bytes::from(res.as_bytes())))
+                    })
+                    .map_err(|_e| Error::from(ErrorKind::MalformedResponse))
+            });
+        Box::new(sign_response)
     }
 }

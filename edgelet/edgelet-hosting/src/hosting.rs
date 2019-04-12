@@ -4,12 +4,11 @@ use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
 use failure::Fail;
+use futures::prelude::*;
 
-use edgelet_core::crypto::{
-    Activate, KeyIdentity, KeyStore as CoreKeyStore, Sign, SignatureAlgorithm,
-};
+use edgelet_core::crypto::{Activate, KeyIdentity, KeyStore as CoreKeyStore, Sign, SignatureAlgorithm, Signature};
 use edgelet_core::{Digest as ExternalDigest, Error as CoreError, ErrorKind as CoreErrorKind};
-use edgelet_http_hosting::HostingClient;
+use edgelet_http_hosting::{HostingClient, HostingInterface};
 
 pub use crate::error::{Error, ErrorKind};
 
@@ -128,37 +127,67 @@ impl Sign for ExternalKey
     /// If an identity was not given, we will sign the data with the stored key.
     fn sign(
         &self,
-        _signature_algorithm: SignatureAlgorithm,
-        _data: &[u8],
+        signature_algorithm: SignatureAlgorithm,
+        data: &[u8],
     ) -> Result<Self::Signature, CoreError> {
-        Ok(ExternalDigest::new(Bytes::from("abc")))
+//        Ok(ExternalDigest::new(Bytes::from("abc")))
 
-        //        match self.identity {
-        //            KeyIdentity::Device => self
-        //                .hosting
-        //                .lock()
-        //                .expect("Lock failed")
-        //                .sign_with_identity(data)
-        //                .map_err(|err| Error::from(err.context(ErrorKind::HostingClient)))
-        //                .map_err(|err| CoreError::from(err.context(CoreErrorKind::KeyStore))),
-        //            KeyIdentity::Module(ref _m) => self
-        //                .hosting
-        //                .lock()
-        //                .expect("Lock failed")
-        //                .derive_and_sign_with_identity(
-        //                    data,
-        //                    format!(
-        //                        "{}{}",
-        //                        match self.identity {
-        //                            KeyIdentity::Device => "",
-        //                            KeyIdentity::Module(ref m) => m,
-        //                        },
-        //                        self.key_name
-        //                    )
-        //                        .as_bytes(),
-        //                )
-        //                .map_err(|err| Error::from(err.context(ErrorKind::HostingClient)))
-        //                .map_err(|err| CoreError::from(err.context(CoreErrorKind::KeyStore))),
-        //        }
+        let identity = match self.identity {
+            KeyIdentity::Device =>
+                None,
+            KeyIdentity::Module(ref m) =>{
+                Some(Bytes::from(format!("{}{}", m, self.key_name)))
+            }
+        };
+
+//        let mut identity = None;
+//        match self.identity {
+//            KeyIdentity::Device => {},
+//            KeyIdentity::Module(ref m) => {
+//                let key = format!("{}{}", m, self.key_name);
+//                identity = Some(key.as_bytes().clone());
+//            }
+//        };
+
+        self.hosting
+            .lock()
+            .expect("Lock failed")
+            .sign(
+                identity.map( as_bytes()),
+                &signature_algorithm.to_string(),
+                data
+            )
+            .map_err(|err| Error::from(err.context(ErrorKind::HostingClient)))
+            .map_err(|err| CoreError::from(err.context(CoreErrorKind::KeyStore)))
+            .wait()
+            .and_then(|digest| {
+                match digest {
+                    None => Err(CoreError::from(Error::from(ErrorKind::EmptyDigest).context(CoreErrorKind::KeyStore))),
+                    Some(t) => {
+                        println!(
+                            "Signed data: \"{}\"",
+                            base64::encode(&t.clone())
+                        );
+
+                        Ok(Self::Signature::new(t))
+                    }
+                }
+            })
+//            .map(|digest| {
+//                digest.is_none()
+//                match digest {
+//                    None => Error::from(ErrorKind::EmptyDigest),
+//                    Some(t) => {
+//                        println!(
+//                            "Signed data: \"{}\"",
+//                            base64::encode(&t.clone())
+//                        );
+//
+//                        Self::Signature {
+//                            bytes: t
+//                        }
+//                    }
+//                }
+//            })
     }
 }

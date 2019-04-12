@@ -22,6 +22,8 @@ pub enum ErrorKind {
     EmptyStrings,
     #[fail(display = "Only Device keys are allowed to be activated")]
     NoModuleActivation,
+    #[fail(display = "Empty digest received.")]
+    EmptyDigest,
 }
 
 impl Fail for Error {
