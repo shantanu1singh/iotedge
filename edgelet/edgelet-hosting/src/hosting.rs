@@ -6,7 +6,7 @@ use bytes::Bytes;
 use failure::Fail;
 use futures::prelude::*;
 
-use edgelet_core::crypto::{Activate, KeyIdentity, KeyStore as CoreKeyStore, Sign, SignatureAlgorithm, Signature};
+use edgelet_core::crypto::{Activate, KeyIdentity, KeyStore as CoreKeyStore, Sign, SignatureAlgorithm};
 use edgelet_core::{Digest as ExternalDigest, Error as CoreError, ErrorKind as CoreErrorKind};
 use edgelet_http_hosting::{HostingClient, HostingInterface};
 
@@ -136,7 +136,7 @@ impl Sign for ExternalKey
             KeyIdentity::Device =>
                 None,
             KeyIdentity::Module(ref m) =>{
-                Some(Bytes::from(format!("{}{}", m, self.key_name)))
+                Some(format!("{}{}", m, self.key_name))
             }
         };
 
@@ -153,7 +153,7 @@ impl Sign for ExternalKey
             .lock()
             .expect("Lock failed")
             .sign(
-                identity.map( as_bytes()),
+                identity.as_ref().map( |s| s.as_bytes()),
                 &signature_algorithm.to_string(),
                 data
             )
@@ -173,21 +173,5 @@ impl Sign for ExternalKey
                     }
                 }
             })
-//            .map(|digest| {
-//                digest.is_none()
-//                match digest {
-//                    None => Error::from(ErrorKind::EmptyDigest),
-//                    Some(t) => {
-//                        println!(
-//                            "Signed data: \"{}\"",
-//                            base64::encode(&t.clone())
-//                        );
-//
-//                        Self::Signature {
-//                            bytes: t
-//                        }
-//                    }
-//                }
-//            })
     }
 }
