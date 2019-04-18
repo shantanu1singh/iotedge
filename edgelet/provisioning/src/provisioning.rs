@@ -15,7 +15,6 @@ use url::Url;
 
 use dps::registration::{DpsAuthKind, DpsClient, DpsTokenSource};
 use edgelet_core::crypto::{Activate, KeyIdentity, KeyStore, MemoryKey, MemoryKeyStore};
-use edgelet_hosting::hosting::ExternalKeyStore;
 use edgelet_hsm::tpm::{TpmKey, TpmKeyStore};
 use edgelet_http::client::{Client as HttpClient, ClientImpl};
 use edgelet_http_hosting::{HostingClient, HostingInterface};
@@ -116,31 +115,37 @@ impl ExternalProvisioning
 
 impl Provision for ExternalProvisioning
 {
-    type Hsm = ExternalKeyStore;
+    type Hsm = TpmKeyStore;
 
     fn provision(
         self,
-        _key_activator: Self::Hsm,
+        mut key_activator: Self::Hsm,
     ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send> {
         let result = self
             .client
             .get_device_connection_information()
-            .map(|device_connection_info| {
+            .map_err(|err| Error::from(err.context(ErrorKind::Provision)))
+            .and_then(move |device_connection_info| {
                 info!(
                     "External device registration information: Device \"{}\" in hub \"{}\"",
                     device_connection_info.device_id(),
                     device_connection_info.hub_name()
                 );
 
-                ProvisioningResult {
+                // Passing an empty array as key because in the external mode, the hosting
+                // environment itself creates and activates the actual key.
+                key_activator
+                    .activate_identity_key(KeyIdentity::Device, "primary".to_string(), &Bytes::from(""))
+                    .context(ErrorKind::Provision)?;
+
+                Ok(ProvisioningResult {
                     device_id: device_connection_info.device_id().to_string(),
                     hub_name: device_connection_info.hub_name().to_string(),
                     reconfigure: false,
-                }
-            })
-            .map_err(|err| Error::from(err.context(ErrorKind::Provision)));
+                })
+            });
 
-        Box::new(result.into_future())
+        Box::new(result)
     }
 }
 

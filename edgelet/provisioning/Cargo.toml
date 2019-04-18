@@ -17,7 +17,6 @@ url = "1.7"
 hsm = { path = "../hsm-rs"}
 dps = { path = "../dps" }
 edgelet-core = { path = "../edgelet-core" }
-edgelet-hosting = { path = "../edgelet-hosting" }
 edgelet-hsm = { path = "../edgelet-hsm" }
 edgelet-http = { path = "../edgelet-http" }
 edgelet-http-hosting = { path = "../edgelet-http-hosting" }

@@ -37,9 +37,6 @@ const DEFAULT_NETWORKID: &str = "azure-iot-edge";
 /// This is the default connection string
 pub const DEFAULT_CONNECTION_STRING: &str = "<ADD DEVICE CONNECTION STRING HERE>";
 
-/// This is the default hosting environment endpoint
-pub const DEFAULT_HOSTING_ENVIRONMENT: &str = "<ADD DEVICE HOSTING ENVIRONMENT HERE>";
-
 #[cfg(unix)]
 const DEFAULTS: &str = include_str!("../config/unix/default.yaml");
 

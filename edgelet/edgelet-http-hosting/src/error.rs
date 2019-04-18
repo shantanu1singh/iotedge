@@ -12,7 +12,6 @@ use serde_json;
 use hosting::apis::Error as HostingError;
 
 use crate::IntoResponse;
-//use url::Host;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 
@@ -27,14 +26,6 @@ pub enum ErrorKind {
     #[fail(display = "Client error")]
     Client(HostingError<serde_json::Value>),
 
-    #[fail(display = "Certificate has an invalid private key")]
-    BadPrivateKey,
-
-    //    #[fail(display = "{}", _0)]
-    //    CertOperation(CertOperation),
-    //
-    //    #[fail(display = "{}", _0)]
-    //    EncryptionOperation(EncryptionOperation),
     #[fail(display = "Could not get device connection info")]
     GetDeviceConnectionInformation,
 
@@ -55,15 +46,6 @@ pub enum ErrorKind {
 
     #[fail(display = "Certificate has an invalid private key")]
     MalformedResponse,
-
-    #[fail(display = "Module not found")]
-    ModuleNotFound(String),
-
-    #[fail(display = "Request to sign data failed")]
-    SignData,
-
-    #[fail(display = "Could not start workload service")]
-    StartService,
 }
 
 impl Fail for Error {
@@ -120,7 +102,6 @@ impl IntoResponse for Error {
         }
 
         let status_code = match *self.kind() {
-            ErrorKind::ModuleNotFound(_) => StatusCode::NOT_FOUND,
             ErrorKind::MalformedRequestBody
             | ErrorKind::MalformedRequestParameter(_)
             | ErrorKind::MissingRequiredParameter(_) => StatusCode::BAD_REQUEST,

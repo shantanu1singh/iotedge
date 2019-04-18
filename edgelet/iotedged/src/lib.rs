@@ -48,7 +48,6 @@ use edgelet_config::{
     Provisioning,
     Settings,
     DEFAULT_CONNECTION_STRING,
-    //    DEFAULT_HOSTING_ENVIRONMENT
 };
 use edgelet_core::crypto::{
     Activate, CreateCertificate, Decrypt, DerivedKeyStore, Encrypt, GetTrustBundle, KeyIdentity,
@@ -60,7 +59,6 @@ use edgelet_core::{
     WorkloadConfig, UNIX_SCHEME,
 };
 use edgelet_docker::{DockerConfig, DockerModuleRuntime};
-use edgelet_hosting::hosting::{ExternalKey, ExternalKeyStore};
 use edgelet_hsm::tpm::{TpmKey, TpmKeyStore};
 use edgelet_hsm::Crypto;
 use edgelet_http::certificate_manager::CertificateManager;
@@ -186,14 +184,6 @@ impl Main {
             }
         }
 
-        /*if let Provisioning::External(ref external) = settings.provisioning() {
-            if external.endpoint() == DEFAULT_HOSTING_ENVIRONMENT {
-                return Err(Error::from(ErrorKind::Initialize(
-                    InitializeErrorReason::NotConfigured,
-                )));
-            }
-        }*/
-
         let hyper_client = MaybeProxyClient::new(get_proxy_uri(None)?)
             .context(ErrorKind::Initialize(InitializeErrorReason::HttpClient))?;
 
@@ -275,15 +265,8 @@ impl Main {
                 )?;
             }
             Provisioning::External(external) => {
-                let hosting_client = HostingClient::new(
-                    external.endpoint()
-                )
-                .context(ErrorKind::Initialize(
-                    InitializeErrorReason::ExternalHostingClient,
-                ))?;
-
                 let (key_store, provisioning_result, root_key) =
-                    external_provision(&external, hosting_client, &mut tokio_runtime)?;
+                    external_provision(&external, &mut tokio_runtime)?;
 
                 info!("Finished external provisioning edge device.");
                 let cfg = WorkloadData::new(
@@ -666,42 +649,39 @@ fn manual_provision(
 }
 
 fn external_provision(
-    _provisioning: &External,
-    hosting_client: HostingClient,
+    provisioning: &External,
     tokio_runtime: &mut tokio::runtime::Runtime,
 ) -> Result<
     (
-        DerivedKeyStore<ExternalKey>,
+        DerivedKeyStore<TpmKey>,
         ProvisioningResult,
-        ExternalKey,
+        TpmKey,
     ),
     Error>
-//>
-//where
-//    HC: 'static + ClientImpl + Clone,
 {
-    /*let client = HostingClient::new(
-        hyper_client,
-        provisioning.endpoint().clone(),
-        "".to_string(),
-    ).context(ErrorKind::Initialize(
-        InitializeErrorReason::ExternalProvisioningClient,
-    ))?; // Figure out API version later. Is it needed?*/
-
-    let external = ExternalProvisioning::new(hosting_client.clone());
-    let external_hsm = ExternalKeyStore::from_hosting_environment(hosting_client).context(
-        ErrorKind::Initialize(InitializeErrorReason::ExternalHostingClient),
-    )?;
+    let hosting_client = HostingClient::new(
+        provisioning.endpoint()
+    )
+        .context(ErrorKind::Initialize(
+            InitializeErrorReason::ExternalHostingClient,
+        ))?;
+    let external = ExternalProvisioning::new(hosting_client);
+    let tpm = Tpm::new().context(ErrorKind::Initialize(
+        InitializeErrorReason::ExternalHostingClient,
+    ))?;
+    let tpm_hsm = TpmKeyStore::from_hsm(tpm).context(ErrorKind::Initialize(
+        InitializeErrorReason::ExternalHostingClient,
+    ))?;
 
     let provision = external
-        .provision(external_hsm.clone())
+        .provision(tpm_hsm.clone())
         .map_err(|err| {
             Error::from(err.context(ErrorKind::Initialize(
                 InitializeErrorReason::ExternalHostingClient,
             )))
         })
         .and_then(move |prov_result| {
-            external_hsm
+            tpm_hsm
                 .get(&KeyIdentity::Device, "primary")
                 .map_err(|err| {
                     Error::from(err.context(ErrorKind::Initialize(
