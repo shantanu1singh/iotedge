@@ -83,21 +83,40 @@ impl HostingInterface for HostingClient {
     }
 }
 
-//#[cfg(test)]
-//mod tests {
-//    use edgelet_core::{self, ModuleRuntimeState};
-//    use edgelet_http::route::Parameters;
-//    use edgelet_test_utils::module::*;
-//    use futures::Stream;
-//    use management::models::SystemInfo;
-//
-//    use super::*;
-//    use crate::server::module::tests::Error;
-//
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_hosting_url() {
+        let client =
+            HostingClient::new(&(Url::parse("fd://").unwrap()));
+        match client {
+            Ok(_t) => { panic!("Unexpected to succeed with invalid Url.")}
+            Err( ref err) => {
+                match err.kind() {
+                    ErrorKind::InitializeHostingClient => {}
+                    _ => {
+                        panic!("Expected `InitializeHostingClient` but got {:?}", err);
+                    }
+                }
+            }
+        };
+    }
+
+    #[test]
+    fn valid_hosting_url() {
+        let client =
+            HostingClient::new(&(Url::parse("http://localhost:99/").unwrap()));
+        assert!(client.is_ok());
+    }
+
 //    #[test]
-//    fn system_info_success() {
+//    fn get_device_connection_info_error() {
 //        // arrange
-//        let state = ModuleRuntimeState::default();
+//        let client = HostingClient { client: new A};
+//        assert!(client.is_err());
+//
 //        let config = TestConfig::new("microsoft/test-image".to_string());
 //        let module: TestModule<Error> =
 //            TestModule::new("test-module".to_string(), config, Ok(state));
@@ -128,4 +147,9 @@ impl HostingInterface for HostingClient {
 //            .wait()
 //            .unwrap();
 //    }
-//}
+//
+//    #[test]
+//    fn get_device_connection_info_success() {
+//
+//    }
+}
