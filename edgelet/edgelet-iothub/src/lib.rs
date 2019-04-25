@@ -126,7 +126,6 @@ where
             percent_encode(audience.to_lowercase().as_bytes(), IOTHUB_ENCODE_SET).to_string();
         let sig_data = format!("{}\n{}", &resource_uri, expiry);
 
-        println!("Calling sign");
         let signature = self
             .key
             .sign(SignatureAlgorithm::HMACSHA256, sig_data.as_bytes())
@@ -137,7 +136,6 @@ where
             .append_pair("sig", &signature)
             .append_pair("se", &expiry)
             .finish();
-        println!("Token {:?}", token);
         Ok(token)
     }
 }

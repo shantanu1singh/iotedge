@@ -1,17 +1,9 @@
 // Copyright (c) Microsoft. All rights reserved.
 
 use std::fmt::{self, Display};
-
 use failure::{Backtrace, Context, Fail};
-use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
-use hyper::{Body, Response, StatusCode};
-use log::error;
 use serde_json;
-
 use hosting::apis::Error as HostingError;
-use hosting::models::ErrorResponse;
-
-use crate::IntoResponse;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 
@@ -31,18 +23,6 @@ pub enum ErrorKind {
 
     #[fail(display = "Hosting client initialization")]
     InitializeHostingClient,
-
-    #[fail(display = "Request body is malformed")]
-    MalformedRequestBody,
-
-    #[fail(display = "The request parameter `{}` is malformed", _0)]
-    MalformedRequestParameter(&'static str),
-
-    #[fail(display = "The request is missing required parameter `{}`", _0)]
-    MissingRequiredParameter(&'static str),
-
-    #[fail(display = "Certificate has an invalid private key")]
-    MalformedResponse,
 }
 
 impl Fail for Error {
@@ -86,81 +66,5 @@ impl From<ErrorKind> for Error {
 impl From<Context<ErrorKind>> for Error {
     fn from(inner: Context<ErrorKind>) -> Self {
         Error { inner }
-    }
-}
-
-impl IntoResponse for Error {
-    fn into_response(self) -> Response<Body> {
-        let mut fail: &dyn Fail = &self;
-        let mut message = self.to_string();
-        while let Some(cause) = fail.cause() {
-            message.push_str(&format!("\n\tcaused by: {}", cause.to_string()));
-            fail = cause;
-        }
-
-        let status_code = match *self.kind() {
-            ErrorKind::MalformedRequestBody
-            | ErrorKind::MalformedRequestParameter(_)
-            | ErrorKind::MissingRequiredParameter(_) => StatusCode::BAD_REQUEST,
-            _ => {
-                error!("Internal server error: {}", message);
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-        };
-
-        // Per the RFC, status code NotModified should not have a body
-        let body = if status_code == StatusCode::NOT_MODIFIED {
-            String::new()
-        } else {
-            serde_json::to_string(&ErrorResponse::new(message))
-                .expect("serialization of ErrorResponse failed.")
-        };
-
-        let mut response = Response::builder();
-        response
-            .status(status_code)
-            .header(CONTENT_LENGTH, body.len().to_string().as_str());
-
-        if !body.is_empty() {
-            response.header(CONTENT_TYPE, "application/json");
-        }
-
-        response
-            .body(body.into())
-            .expect("response builder failure")
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum CertOperation {
-    CreateIdentityCert,
-    GetServerCert,
-}
-
-impl fmt::Display for CertOperation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CertOperation::CreateIdentityCert => write!(f, "Could not create identity cert"),
-            CertOperation::GetServerCert => write!(f, "Could not get server cert"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum EncryptionOperation {
-    Decrypt,
-    Encrypt,
-    GetTrustBundle,
-    Sign,
-}
-
-impl fmt::Display for EncryptionOperation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EncryptionOperation::Decrypt => write!(f, "Could not decrypt"),
-            EncryptionOperation::Encrypt => write!(f, "Could not encrypt"),
-            EncryptionOperation::GetTrustBundle => write!(f, "Could not get trust bundle"),
-            EncryptionOperation::Sign => write!(f, "Could not sign"),
-        }
     }
 }

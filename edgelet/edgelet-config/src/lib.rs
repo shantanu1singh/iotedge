@@ -432,6 +432,8 @@ mod tests {
     static GOOD_SETTINGS_DPS_SYM_KEY: &str = "test/linux/sample_settings.dps.sym.yaml";
     #[cfg(unix)]
     static GOOD_SETTINGS_CASE_SENSITIVE: &str = "test/linux/case_sensitive.yaml";
+    #[cfg(unix)]
+    static GOOD_SETTINGS_EXTERNAL: &str = "test/linux/sample_settings.external.yaml";
 
     #[cfg(windows)]
     static GOOD_SETTINGS: &str = "test/windows/sample_settings.yaml";
@@ -447,6 +449,8 @@ mod tests {
     static GOOD_SETTINGS_DPS_SYM_KEY: &str = "test/windows/sample_settings.dps.sym.yaml";
     #[cfg(windows)]
     static GOOD_SETTINGS_CASE_SENSITIVE: &str = "test/windows/case_sensitive.yaml";
+    #[cfg(windows)]
+    static GOOD_SETTINGS_EXTERNAL: &str = "test/windows/sample_settings.external.yaml";
 
     fn unwrap_manual_provisioning(p: &Provisioning) -> String {
         match p {
@@ -529,6 +533,20 @@ mod tests {
                 assert_eq!(dps.scope_id(), "i got no time for the jibba-jabba");
                 assert_eq!(dps.registration_id(), "register me fool");
                 assert_eq!(dps.symmetric_key().unwrap(), "first name Mr last name T");
+            }
+            _ => assert!(false),
+        };
+    }
+
+    #[test]
+    fn external_prov_get_settings() {
+        let settings = Settings::<DockerConfig>::new(Some(Path::new(GOOD_SETTINGS_EXTERNAL)));
+        println!("{:?}", settings);
+        assert!(settings.is_ok());
+        let s = settings.unwrap();
+        match s.provisioning() {
+            Provisioning::External(ref external) => {
+                assert_eq!(external.endpoint(), "http://localhost:9999");
             }
             _ => assert!(false),
         };
