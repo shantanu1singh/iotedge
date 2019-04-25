@@ -546,7 +546,7 @@ mod tests {
         let s = settings.unwrap();
         match s.provisioning() {
             Provisioning::External(ref external) => {
-                assert_eq!(external.endpoint(), "http://localhost:9999");
+                assert_eq!(external.endpoint().as_str(), "http://localhost:9999/");
             }
             _ => assert!(false),
         };
