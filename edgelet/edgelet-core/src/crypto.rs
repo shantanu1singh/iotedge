@@ -61,15 +61,9 @@ pub trait KeyStore {
     fn get(&self, identity: &KeyIdentity, key_name: &str) -> Result<Self::Key, Error>;
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub enum SignatureAlgorithm {
     HMACSHA256,
-}
-
-impl fmt::Display for SignatureAlgorithm {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 pub trait Signature {

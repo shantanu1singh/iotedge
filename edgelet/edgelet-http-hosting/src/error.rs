@@ -2,7 +2,6 @@
 
 use std::fmt::{self, Display};
 
-use crate::models::ErrorResponse;
 use failure::{Backtrace, Context, Fail};
 use hyper::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use hyper::{Body, Response, StatusCode};
@@ -10,6 +9,7 @@ use log::error;
 use serde_json;
 
 use hosting::apis::Error as HostingError;
+use hosting::models::ErrorResponse;
 
 use crate::IntoResponse;
 
@@ -28,9 +28,6 @@ pub enum ErrorKind {
 
     #[fail(display = "Could not get device connection info")]
     GetDeviceConnectionInformation,
-
-    #[fail(display = "The initialization of hosting client failed")]
-    HostingClientInitializationFailure,
 
     #[fail(display = "Hosting client initialization")]
     InitializeHostingClient,

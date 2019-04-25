@@ -8,11 +8,9 @@ use hyper::{Body, Response};
 
 pub mod client;
 pub mod error;
-pub mod models;
 
 pub use client::{HostingClient, HostingInterface};
 pub use error::{Error, ErrorKind};
-pub use models::*;
 
 pub trait IntoResponse {
     fn into_response(self) -> Response<Body>;
