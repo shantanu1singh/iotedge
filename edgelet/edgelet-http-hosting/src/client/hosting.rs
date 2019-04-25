@@ -25,16 +25,13 @@ pub trait HostingInterface {
     fn get_device_connection_information(&self) -> Self::DeviceConnectionInformationFuture;
 }
 
-pub struct HostingClient<T>
-where
-    T: HostingApi
+pub struct HostingClient<'a>
 {
-    client: T,
+    api_client: Arc<APIClient>,
+    client: &'a Box<dyn HostingApi>,
 }
 
-impl<T> HostingClient<T>
-where
-    T: HostingApi
+impl HostingClient
 {
     pub fn new(url: &Url) -> Result<Self, Error> {
         let client = Client::builder()
@@ -54,28 +51,28 @@ where
             Ok(UrlConnector::build_hyper_uri(&scheme, base_path, path)?)
         });
 
+        let api_client_instance = Arc::new(APIClient::new(configuration));
         let hosting_client = HostingClient {
-            client: Arc::new(APIClient::new(configuration)),
+            api_client: api_client_instance,
+            client: api_client_instance.hosting_api()
         };
 
-        Ok(hosting_client.client.hosting_api())
+        Ok(hosting_client)
     }
 }
 
-impl<T> Clone for HostingClient<T>
-where
-   T: HostingApi
+impl Clone for HostingClient
 {
     fn clone(&self) -> Self {
+        let clone = self.api_client.clone();
         HostingClient {
-            client: self.client.clone(),
+            api_client: clone,
+            client: clone.hosting_api()
         }
     }
 }
 
-impl<T> HostingInterface for HostingClient<T>
-where
-    T: HostingApi
+impl HostingInterface for HostingClient
 {
     type Error = Error;
 
@@ -127,19 +124,23 @@ mod tests {
         assert!(client.is_ok());
     }
 
-    struct TestHostingApi{
-        pub error : Option<Error>,
+    struct TestHostingApi<T>
+        where T: Send + Sync
+    {
+        pub error : Option<HostingError<T>>,
     }
 
-    impl HostingApi for TestHostingApi{
+    impl<T> HostingApi for TestHostingApi<T>
+        where T: Send + Sync
+    {
         fn get_device_connection_information(
             &self,
             api_version: &str,
-        ) -> Box<dyn Future<Item = hosting::models::DeviceConnectionInfo, Error = HostingError> + Send>{
-            match self.throwError {
+        ) -> Box<dyn Future<Item = hosting::models::DeviceConnectionInfo, Error = HostingError<serde_json::Value>> + Send>{
+            match self.error.as_ref() {
                 None => Box::new(Ok(DeviceConnectionInfo::new(
                     "hub".to_string(), "device".to_string())).into_future()),
-                Some(s) => Box::new(Err(s).into_future())
+                Some(s) => Box::new(Err(s.clone()).into_future())
             }
         }
 
@@ -147,10 +148,10 @@ mod tests {
             &self,
             api_version: &str,
             payload: hosting::models::SignRequest,
-        ) -> Box<dyn Future<Item = hosting::models::SignResponse, Error = Error> + Send>{
-            match self.throwError {
+        ) -> Box<dyn Future<Item = hosting::models::SignResponse, Error = HostingError<serde_json::Value>> + Send>{
+            match self.error.as_ref() {
                 None => Box::new(Ok(SignResponse::new("a".to_string())).into_future()),
-                Some(s) => Box::new(Err(s).into_future())
+                Some(s) => Box::new(Err(s.clone()).into_future())
             }
         }
     }
@@ -159,9 +160,13 @@ mod tests {
     fn get_device_connection_info_error() {
         // arrange
         let hosting_error = HostingError::Hyper(None);
-        let client = TestHostingApi { error: hosting_error };
+        let hosting_api = TestHostingApi { error: Some(hosting_error) };
+        let client = HostingClient{
+            api_client: None,
+            client: hosting_api
+        };
 
-        let execute = |client: TestHostingApi| {
+        let execute = |client: HostingClient| {
             client.get_device_connection_information(crate::HOSTING_API_VERSION)
                 .map(|| panic!("Expected a failure."))
                 .map_err(|err| {
@@ -184,11 +189,11 @@ mod tests {
         execute(client);
 
         let hosting_error = HostingError::Serde(None);
-        let client = TestHostingApi { error: hosting_error };
+        let client = TestHostingApi { error: Some(hosting_error) };
         execute(client);
 
-        let hosting_error = HostingError::ApiError(HostingApiError { code: hyper::StatusCode(400), content: None });
-        let client = TestHostingApi { error: hosting_error };
+        let hosting_error = HostingError::ApiError(HostingApiError { code: hyper::StatusCode::from_u16(400).unwrap(), content: None });
+        let client = TestHostingApi { error: Some(hosting_error) };
         execute(client);
     }
 
