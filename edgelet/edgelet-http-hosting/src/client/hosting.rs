@@ -8,6 +8,7 @@ use hyper::{Client};
 use hosting::apis::client::APIClient;
 use hosting::apis::configuration::Configuration;
 use hosting::models::*;
+use hosting::apis::HostingApi;
 use url::Url;
 
 use edgelet_core::{UrlExt};
@@ -24,11 +25,17 @@ pub trait HostingInterface {
     fn get_device_connection_information(&self) -> Self::DeviceConnectionInformationFuture;
 }
 
-pub struct HostingClient {
-    client: Arc<APIClient>,
+pub struct HostingClient<T>
+where
+    T: HostingApi
+{
+    client: T,
 }
 
-impl HostingClient {
+impl<T> HostingClient<T>
+where
+    T: HostingApi
+{
     pub fn new(url: &Url) -> Result<Self, Error> {
         let client = Client::builder()
             .build(UrlConnector::new(url).context(ErrorKind::InitializeHostingClient)?);
@@ -50,11 +57,15 @@ impl HostingClient {
         let hosting_client = HostingClient {
             client: Arc::new(APIClient::new(configuration)),
         };
-        Ok(hosting_client)
+
+        Ok(hosting_client.client.hosting_api())
     }
 }
 
-impl Clone for HostingClient {
+impl<T> Clone for HostingClient<T>
+where
+   T: HostingApi
+{
     fn clone(&self) -> Self {
         HostingClient {
             client: self.client.clone(),
@@ -62,7 +73,10 @@ impl Clone for HostingClient {
     }
 }
 
-impl HostingInterface for HostingClient {
+impl<T> HostingInterface for HostingClient<T>
+where
+    T: HostingApi
+{
     type Error = Error;
 
     type DeviceConnectionInformationFuture =
@@ -71,7 +85,6 @@ impl HostingInterface for HostingClient {
     fn get_device_connection_information(&self) -> Self::DeviceConnectionInformationFuture {
         let connection_info = self
             .client
-            .hosting_api()
             .get_device_connection_information(crate::HOSTING_API_VERSION)
             .map_err(|err| {
                 Error::from_hosting_error(
@@ -86,6 +99,9 @@ impl HostingInterface for HostingClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hosting::apis::Error as HostingError;
+    use hosting::apis::ApiError as HostingApiError;
+//    use hosting::models::*;
 
     #[test]
     fn invalid_hosting_url() {
@@ -111,45 +127,73 @@ mod tests {
         assert!(client.is_ok());
     }
 
-//    #[test]
-//    fn get_device_connection_info_error() {
-//        // arrange
-//        let client = HostingClient { client: new A};
-//        assert!(client.is_err());
-//
-//        let config = TestConfig::new("microsoft/test-image".to_string());
-//        let module: TestModule<Error> =
-//            TestModule::new("test-module".to_string(), config, Ok(state));
-//        let runtime = TestRuntime::new(Ok(module));
-//        let handler = GetSystemInfo::new(runtime);
-//        let request = Request::get("http://localhost/info")
-//            .body(Body::default())
-//            .unwrap();
-//
-//        // act
-//        let response = handler.handle(request, Parameters::new()).wait().unwrap();
-//
-//        // assert
-//        response
-//            .into_body()
-//            .concat2()
-//            .and_then(|b| {
-//                let system_info: SystemInfo = serde_json::from_slice(&b).unwrap();
-//                let os_type = system_info.os_type();
-//                let architecture = system_info.architecture();
-//
-//                assert_eq!("os_type_sample", os_type);
-//                assert_eq!("architecture_sample", architecture);
-//                assert_eq!(edgelet_core::version(), system_info.version());
-//
-//                Ok(())
-//            })
-//            .wait()
-//            .unwrap();
-//    }
-//
-//    #[test]
-//    fn get_device_connection_info_success() {
-//
-//    }
+    struct TestHostingApi{
+        pub error : Option<Error>,
+    }
+
+    impl HostingApi for TestHostingApi{
+        fn get_device_connection_information(
+            &self,
+            api_version: &str,
+        ) -> Box<dyn Future<Item = hosting::models::DeviceConnectionInfo, Error = HostingError> + Send>{
+            match self.throwError {
+                None => Box::new(Ok(DeviceConnectionInfo::new(
+                    "hub".to_string(), "device".to_string())).into_future()),
+                Some(s) => Box::new(Err(s).into_future())
+            }
+        }
+
+        fn sign(
+            &self,
+            api_version: &str,
+            payload: hosting::models::SignRequest,
+        ) -> Box<dyn Future<Item = hosting::models::SignResponse, Error = Error> + Send>{
+            match self.throwError {
+                None => Box::new(Ok(SignResponse::new("a".to_string())).into_future()),
+                Some(s) => Box::new(Err(s).into_future())
+            }
+        }
+    }
+
+    #[test]
+    fn get_device_connection_info_error() {
+        // arrange
+        let hosting_error = HostingError::Hyper(None);
+        let client = TestHostingApi { error: hosting_error };
+
+        let execute = |client: TestHostingApi| {
+            client.get_device_connection_information(crate::HOSTING_API_VERSION)
+                .map(|| panic!("Expected a failure."))
+                .map_err(|err| {
+                    match err.kind() {
+                        ErrorKind::GetDeviceConnectionInformation => {
+                            match err.cause() {
+                                None => {}
+                                Some(_t) =>  {}
+                            }
+
+//                            assert_eq!(client.error, err.context().);
+                        }
+                        _ => {
+                            panic!("Expected `GetDeviceConnectionInformation` but got {:?}", err);
+                        }
+                    }
+                });
+        };
+
+        execute(client);
+
+        let hosting_error = HostingError::Serde(None);
+        let client = TestHostingApi { error: hosting_error };
+        execute(client);
+
+        let hosting_error = HostingError::ApiError(HostingApiError { code: hyper::StatusCode(400), content: None });
+        let client = TestHostingApi { error: hosting_error };
+        execute(client);
+    }
+
+    #[test]
+    fn get_device_connection_info_success() {
+
+    }
 }

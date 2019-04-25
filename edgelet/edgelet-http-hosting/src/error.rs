@@ -25,12 +25,6 @@ pub enum ErrorKind {
     InitializeHostingClient,
 }
 
-//impl fmt::Display for ErrorKind {
-//    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//        write!(f, "{:?}", self)
-//    }
-//}
-
 impl Fail for Error {
     fn cause(&self) -> Option<&dyn Fail> {
         self.inner.cause()
