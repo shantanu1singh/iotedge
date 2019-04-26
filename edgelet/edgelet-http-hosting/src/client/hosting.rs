@@ -25,10 +25,20 @@ pub trait HostingInterface {
     fn get_device_connection_information(&self) -> Self::DeviceConnectionInformationFuture;
 }
 
-pub struct HostingClient<'a>
+pub trait GetApi {
+    fn get_api(&self) -> &dyn HostingApi;
+}
+
+pub struct HostingClient
 {
-    api_client: Arc<APIClient>,
-    client: &'a Box<dyn HostingApi>,
+    client: Arc<dyn GetApi>,
+}
+
+impl GetApi for APIClient{
+    fn get_api(&self) -> &dyn HostingApi
+    {
+        return self.hosting_api();
+    }
 }
 
 impl HostingClient
@@ -51,10 +61,8 @@ impl HostingClient
             Ok(UrlConnector::build_hyper_uri(&scheme, base_path, path)?)
         });
 
-        let api_client_instance = Arc::new(APIClient::new(configuration));
         let hosting_client = HostingClient {
-            api_client: api_client_instance,
-            client: api_client_instance.hosting_api()
+            client: Arc::new(APIClient::new(configuration))
         };
 
         Ok(hosting_client)
@@ -64,10 +72,8 @@ impl HostingClient
 impl Clone for HostingClient
 {
     fn clone(&self) -> Self {
-        let clone = self.api_client.clone();
         HostingClient {
-            api_client: clone,
-            client: clone.hosting_api()
+            client: self.client.clone()
         }
     }
 }
@@ -82,6 +88,7 @@ impl HostingInterface for HostingClient
     fn get_device_connection_information(&self) -> Self::DeviceConnectionInformationFuture {
         let connection_info = self
             .client
+            .get_api()
             .get_device_connection_information(crate::HOSTING_API_VERSION)
             .map_err(|err| {
                 Error::from_hosting_error(
@@ -96,9 +103,9 @@ impl HostingInterface for HostingClient
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::{Future};
     use hosting::apis::Error as HostingError;
     use hosting::apis::ApiError as HostingApiError;
-//    use hosting::models::*;
 
     #[test]
     fn invalid_hosting_url() {
@@ -124,81 +131,94 @@ mod tests {
         assert!(client.is_ok());
     }
 
-    struct TestHostingApi<T>
-        where T: Send + Sync
+    struct TestHostingApiError(HostingApiError<serde_json::Value>);
+
+    impl Clone for TestHostingApiError
     {
-        pub error : Option<HostingError<T>>,
+        fn clone(&self) -> Self {
+            Self(HostingApiError{ code: self.0.code, content: self.0.content.clone() })
+        }
     }
 
-    impl<T> HostingApi for TestHostingApi<T>
-        where T: Send + Sync
+    struct TestHostingApi
+    {
+        pub error : Option<TestHostingApiError>,
+    }
+
+    impl GetApi for TestHostingApi
+    {
+        fn get_api(&self) -> &dyn HostingApi
+        {
+            return self;
+        }
+    }
+
+    impl HostingApi for TestHostingApi
     {
         fn get_device_connection_information(
             &self,
-            api_version: &str,
+            _api_version: &str,
         ) -> Box<dyn Future<Item = hosting::models::DeviceConnectionInfo, Error = HostingError<serde_json::Value>> + Send>{
             match self.error.as_ref() {
                 None => Box::new(Ok(DeviceConnectionInfo::new(
                     "hub".to_string(), "device".to_string())).into_future()),
-                Some(s) => Box::new(Err(s.clone()).into_future())
+                Some(s) => Box::new(Err(HostingError::ApiError(s.clone().0)).into_future())
             }
         }
 
         fn sign(
             &self,
-            api_version: &str,
-            payload: hosting::models::SignRequest,
+            _api_version: &str,
+            _payload: hosting::models::SignRequest,
         ) -> Box<dyn Future<Item = hosting::models::SignResponse, Error = HostingError<serde_json::Value>> + Send>{
             match self.error.as_ref() {
                 None => Box::new(Ok(SignResponse::new("a".to_string())).into_future()),
-                Some(s) => Box::new(Err(s.clone()).into_future())
+                Some(s) => Box::new(Err(HostingError::ApiError(s.clone().0)).into_future())
             }
         }
     }
 
     #[test]
     fn get_device_connection_info_error() {
-        // arrange
-        let hosting_error = HostingError::Hyper(None);
+        let hosting_error = TestHostingApiError(
+            HostingApiError { code: hyper::StatusCode::from_u16(400).unwrap(), content: None });
         let hosting_api = TestHostingApi { error: Some(hosting_error) };
-        let client = HostingClient{
-            api_client: None,
-            client: hosting_api
+        let client = HostingClient {
+            client: Arc::new(hosting_api)
         };
 
-        let execute = |client: HostingClient| {
-            client.get_device_connection_information(crate::HOSTING_API_VERSION)
-                .map(|| panic!("Expected a failure."))
-                .map_err(|err| {
+        let res = client.get_device_connection_information()
+            .then(|result|
+                match result {
+                    Ok(_) => panic!("Expected a failure."),
+                    Err(err) =>
                     match err.kind() {
-                        ErrorKind::GetDeviceConnectionInformation => {
-                            match err.cause() {
-                                None => {}
-                                Some(_t) =>  {}
-                            }
-
-//                            assert_eq!(client.error, err.context().);
-                        }
-                        _ => {
-                            panic!("Expected `GetDeviceConnectionInformation` but got {:?}", err);
-                        }
+                        ErrorKind::GetDeviceConnectionInformation => { Ok::<_, Error>(())},
+                        _ => panic!("Expected `GetDeviceConnectionInformation` but got {:?}", err)
                     }
-                });
-        };
+                }).wait().is_ok();
 
-        execute(client);
-
-        let hosting_error = HostingError::Serde(None);
-        let client = TestHostingApi { error: Some(hosting_error) };
-        execute(client);
-
-        let hosting_error = HostingError::ApiError(HostingApiError { code: hyper::StatusCode::from_u16(400).unwrap(), content: None });
-        let client = TestHostingApi { error: Some(hosting_error) };
-        execute(client);
+        assert!(res);
     }
 
     #[test]
     fn get_device_connection_info_success() {
+        let hosting_api = TestHostingApi { error: None };
+        let client = HostingClient {
+            client: Arc::new(hosting_api)
+        };
 
+        let res = client.get_device_connection_information()
+            .then(|result|
+                match result {
+                    Ok(item) => {
+                        assert_eq!("hub", item.hub_name());
+                        assert_eq!("device", item.device_id());
+                        Ok::<_, Error>(())
+                    },
+                    Err(_err) => panic!("Did not expect a failure.")
+                }).wait().is_ok();
+
+        assert!(res);
     }
 }
