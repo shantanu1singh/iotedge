@@ -133,6 +133,10 @@ const DEVICE_CA_CERT_KEY: &str = "IOTEDGE_DEVICE_CA_CERT";
 const DEVICE_CA_PK_KEY: &str = "IOTEDGE_DEVICE_CA_PK";
 const TRUSTED_CA_CERTS_KEY: &str = "IOTEDGE_TRUSTED_CA_CERTS";
 
+/// The HSM lib expects this variable to be set to the endpoint of the hosting environment in the 'external'
+/// provisioning mode.
+const HOSTING_ENDPOINT_KEY: &str = "IOTEDGE_HOSTING_ENDPOINT";
+
 /// This is the key for the docker network Id.
 const EDGE_NETWORKID_KEY: &str = "NetworkId";
 
@@ -661,10 +665,13 @@ fn external_provision(
 {
     let hosting_client = HostingClient::new(
         provisioning.endpoint()
-    )
-        .context(ErrorKind::Initialize(
+    ).context(ErrorKind::Initialize(
             InitializeErrorReason::ExternalHostingClient,
         ))?;
+
+    // Set the hosting endpoint environment variable for use by the custom HSM library.
+    env::set_var(HOSTING_ENDPOINT_KEY, provisioning.endpoint().as_str());
+
     let external = ExternalProvisioning::new(hosting_client);
     let tpm = Tpm::new().context(ErrorKind::Initialize(
         InitializeErrorReason::ExternalHostingClient,
