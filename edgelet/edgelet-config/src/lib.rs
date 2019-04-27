@@ -274,11 +274,29 @@ impl Dps {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub struct External {
+    #[serde(with = "url_serde")]
+    endpoint: Url,
+}
+
+impl External {
+    pub fn new(endpoint: Url) -> Self {
+        External { endpoint }
+    }
+
+    pub fn endpoint(&self) -> &Url {
+        &self.endpoint
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "source")]
 #[serde(rename_all = "lowercase")]
 pub enum Provisioning {
     Manual(Manual),
     Dps(Dps),
+    External(External),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -560,6 +578,8 @@ mod tests {
     static BAD_SETTINGS_DPS_DEFAULT: &str = "test/linux/bad_sample_settings.dps.default.yaml";
     #[cfg(unix)]
     static BAD_SETTINGS_DPS_SYM_KEY: &str = "test/linux/bad_sample_settings.dps.sym.yaml";
+    #[cfg(unix)]
+    static GOOD_SETTINGS_EXTERNAL: &str = "test/linux/sample_settings.external.yaml";
 
     #[cfg(windows)]
     static GOOD_SETTINGS: &str = "test/windows/sample_settings.yaml";
@@ -587,6 +607,8 @@ mod tests {
     static BAD_SETTINGS_DPS_DEFAULT: &str = "test/windows/bad_sample_settings.dps.default.yaml";
     #[cfg(windows)]
     static BAD_SETTINGS_DPS_SYM_KEY: &str = "test/windows/bad_sample_settings.dps.sym.yaml";
+    #[cfg(windows)]
+    static GOOD_SETTINGS_EXTERNAL: &str = "test/windows/sample_settings.external.yaml";
 
     fn unwrap_manual_provisioning(p: &Provisioning) -> String {
         match p {
@@ -731,6 +753,20 @@ mod tests {
                 }
             }
             _ => unreachable!(),
+        };
+    }
+
+    #[test]
+    fn external_prov_get_settings() {
+        let settings = Settings::<DockerConfig>::new(Some(Path::new(GOOD_SETTINGS_EXTERNAL)));
+        println!("{:?}", settings);
+        assert!(settings.is_ok());
+        let s = settings.unwrap();
+        match s.provisioning() {
+            Provisioning::External(ref external) => {
+                assert_eq!(external.endpoint().as_str(), "http://localhost:9999/");
+            }
+            _ => assert!(false),
         };
     }
 
