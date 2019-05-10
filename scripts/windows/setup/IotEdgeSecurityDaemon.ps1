@@ -128,7 +128,7 @@ function Initialize-IoTEdge {
         [Parameter(ParameterSetName = 'DPS')]
         [Switch] $Dps,
 
-        # Specified the daemon will be configured using an external hosting endpoint.
+        # Specified the daemon will be configured using an external provisioning endpoint.
         [Parameter(ParameterSetName = 'External')]
         [Switch] $External,
 
@@ -181,7 +181,7 @@ function Initialize-IoTEdge {
         [ValidateNotNullOrEmpty()]
         [String] $DeviceTrustbundle,
 
-        # The hosting environment endpoint for the External provisioning mode.
+        # The external provisioning environment endpoint for the External provisioning mode.
         [Parameter(Mandatory = $true, ParameterSetName = 'External')]
         [ValidateNotNullOrEmpty()]
         [String] $Endpoint,
@@ -486,7 +486,7 @@ function Install-IoTEdge {
         [Parameter(ParameterSetName = 'DPS')]
         [Switch] $Dps,
 
-        # Specified the daemon will be configured using an external hosting endpoint.
+        # Specified the daemon will be configured using an external provisioning endpoint.
         [Parameter(ParameterSetName = 'External')]
         [Switch] $External,
 
@@ -539,7 +539,7 @@ function Install-IoTEdge {
         [ValidateNotNullOrEmpty()]
         [String] $DeviceTrustbundle,
 
-        # The hosting environment endpoint for the External provisioning mode.
+        # The external provisioning environment endpoint for the External provisioning mode.
         [Parameter(Mandatory = $true, ParameterSetName = 'External')]
         [ValidateNotNullOrEmpty()]
         [String] $Endpoint,
