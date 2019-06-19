@@ -320,11 +320,56 @@ impl Listen {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Network {
+    name: String,
+
+    #[serde(rename = "ipv6", skip_serializing_if = "Option::is_none")]
+    ipv6: Option<bool>,
+
+    #[serde(rename = "ipam", skip_serializing_if = "Option::is_none")]
+    ipam: Option<Vec<Ipam>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Ipam {
+    #[serde(rename = "gateway", skip_serializing_if = "Option::is_none")]
+    gateway: Option<String>,
+
+    #[serde(rename = "subnet", skip_serializing_if = "Option::is_none")]
+    subnet: Option<String>,
+
+    #[serde(rename = "ip_range", skip_serializing_if = "Option::is_none")]
+    ip_range: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum MobyNetwork {
+    Network(Network),
+    Name(String),
+}
+
+impl MobyNetwork {
+    pub fn name(&self) -> &str {
+        match self {
+            MobyNetwork::Name(name) => {
+                        if name.is_empty() {
+            &DEFAULT_NETWORKID
+        } else {
+                            name
+        }
+            },
+            MobyNetwork::Network(network) => &network.name
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MobyRuntime {
     #[serde(with = "url_serde")]
     uri: Url,
-    network: String,
+    network: MobyNetwork,
 }
 
 impl MobyRuntime {
@@ -332,12 +377,13 @@ impl MobyRuntime {
         &self.uri
     }
 
-    pub fn network(&self) -> &str {
-        if self.network.is_empty() {
-            &DEFAULT_NETWORKID
-        } else {
-            &self.network
-        }
+    pub fn network(&self) -> &MobyNetwork {
+//        if self.network.is_empty() {
+//            &DEFAULT_NETWORKID
+//        } else {
+//            &self.network
+//        }
+        &self.network
     }
 }
 
