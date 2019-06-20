@@ -27,13 +27,14 @@ use url::Url;
 use edgelet_core::crypto::MemoryKey;
 use edgelet_core::watchdog::RetryLimit;
 use edgelet_core::ModuleSpec;
+use edgelet_core::network::MobyNetwork;
 use edgelet_utils::log_failure;
 
 mod yaml_file_source;
 use yaml_file_source::YamlFileSource;
 
 /// This is the name of the network created by the iotedged
-const DEFAULT_NETWORKID: &str = "azure-iot-edge";
+//const DEFAULT_NETWORKID: &str = "azure-iot-edge";
 
 /// This is the default connection string
 pub const DEFAULT_CONNECTION_STRING: &str = "<ADD DEVICE CONNECTION STRING HERE>";
@@ -320,50 +321,50 @@ impl Listen {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Network {
-    name: String,
-
-    #[serde(rename = "ipv6", skip_serializing_if = "Option::is_none")]
-    ipv6: Option<bool>,
-
-    #[serde(rename = "ipam", skip_serializing_if = "Option::is_none")]
-    ipam: Option<Vec<Ipam>>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Ipam {
-    #[serde(rename = "gateway", skip_serializing_if = "Option::is_none")]
-    gateway: Option<String>,
-
-    #[serde(rename = "subnet", skip_serializing_if = "Option::is_none")]
-    subnet: Option<String>,
-
-    #[serde(rename = "ip_range", skip_serializing_if = "Option::is_none")]
-    ip_range: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum MobyNetwork {
-    Network(Network),
-    Name(String),
-}
-
-impl MobyNetwork {
-    pub fn name(&self) -> &str {
-        match self {
-            MobyNetwork::Name(name) => {
-                        if name.is_empty() {
-            &DEFAULT_NETWORKID
-        } else {
-                            name
-        }
-            },
-            MobyNetwork::Network(network) => &network.name
-        }
-    }
-}
+//#[derive(Clone, Debug, Deserialize, Serialize)]
+//pub struct Network {
+//    name: String,
+//
+//    #[serde(rename = "ipv6", skip_serializing_if = "Option::is_none")]
+//    ipv6: Option<bool>,
+//
+//    #[serde(rename = "ipam", skip_serializing_if = "Option::is_none")]
+//    ipam: Option<Vec<Ipam>>,
+//}
+//
+//#[derive(Clone, Debug, Deserialize, Serialize)]
+//pub struct Ipam {
+//    #[serde(rename = "gateway", skip_serializing_if = "Option::is_none")]
+//    gateway: Option<String>,
+//
+//    #[serde(rename = "subnet", skip_serializing_if = "Option::is_none")]
+//    subnet: Option<String>,
+//
+//    #[serde(rename = "ip_range", skip_serializing_if = "Option::is_none")]
+//    ip_range: Option<String>,
+//}
+//
+//#[derive(Clone, Debug, Deserialize, Serialize)]
+//#[serde(untagged)]
+//pub enum MobyNetwork {
+//    Network(Network),
+//    Name(String),
+//}
+//
+//impl MobyNetwork {
+//    pub fn name(&self) -> &str {
+//        match self {
+//            MobyNetwork::Name(name) => {
+//                        if name.is_empty() {
+//            &DEFAULT_NETWORKID
+//        } else {
+//                            name
+//        }
+//            },
+//            MobyNetwork::Network(network) => &network.name
+//        }
+//    }
+//}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MobyRuntime {

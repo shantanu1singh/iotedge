@@ -17,6 +17,7 @@ pub mod crypto;
 mod error;
 mod identity;
 mod module;
+pub mod network;
 pub mod watchdog;
 pub mod workload;
 
@@ -35,6 +36,7 @@ pub use module::{
     ModuleRuntimeErrorReason, ModuleRuntimeState, ModuleSpec, ModuleStatus, ModuleTop,
     RegistryOperation, RuntimeOperation, SystemInfo,
 };
+pub use network::{Ipam, MobyNetwork, Network};
 pub use watchdog::RetryLimit;
 pub use workload::WorkloadConfig;
 
