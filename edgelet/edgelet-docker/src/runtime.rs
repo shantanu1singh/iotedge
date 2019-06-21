@@ -902,7 +902,7 @@ mod tests {
     use url::Url;
 
     use docker::models::ContainerCreateBody;
-    use edgelet_core::{Ipam as CoreIpam, ModuleId, ModuleRegistry, ModuleTop, Network};
+    use edgelet_core::{ImagePullPolicy, Ipam as CoreIpam, ModuleId, ModuleRegistry, ModuleTop, Network};
 
     use crate::error::{Error, ErrorKind};
 
@@ -1058,6 +1058,7 @@ mod tests {
             DockerConfig::new("nginx:latest".to_string(), ContainerCreateBody::new(), None)
                 .unwrap(),
             HashMap::new(),
+            ImagePullPolicy::default(),
         )
         .unwrap();
 
