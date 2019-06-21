@@ -216,8 +216,7 @@ impl Main {
         );
         let runtime = DockerModuleRuntime::new(settings.moby_runtime().uri())
             .context(ErrorKind::Initialize(InitializeErrorReason::ModuleRuntime))?
-//            .with_network_id(settings.moby_runtime().network().name().to_string());
-        .with_network_configuration(settings.moby_runtime().network().clone());
+            .with_network_configuration(settings.moby_runtime().network().clone());
 
         init_docker_runtime(&runtime, &mut tokio_runtime)?;
 

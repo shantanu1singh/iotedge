@@ -25,16 +25,13 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 use edgelet_core::crypto::MemoryKey;
+use edgelet_core::network::MobyNetwork;
 use edgelet_core::watchdog::RetryLimit;
 use edgelet_core::ModuleSpec;
-use edgelet_core::network::MobyNetwork;
 use edgelet_utils::log_failure;
 
 mod yaml_file_source;
 use yaml_file_source::YamlFileSource;
-
-/// This is the name of the network created by the iotedged
-//const DEFAULT_NETWORKID: &str = "azure-iot-edge";
 
 /// This is the default connection string
 pub const DEFAULT_CONNECTION_STRING: &str = "<ADD DEVICE CONNECTION STRING HERE>";
@@ -321,51 +318,6 @@ impl Listen {
     }
 }
 
-//#[derive(Clone, Debug, Deserialize, Serialize)]
-//pub struct Network {
-//    name: String,
-//
-//    #[serde(rename = "ipv6", skip_serializing_if = "Option::is_none")]
-//    ipv6: Option<bool>,
-//
-//    #[serde(rename = "ipam", skip_serializing_if = "Option::is_none")]
-//    ipam: Option<Vec<Ipam>>,
-//}
-//
-//#[derive(Clone, Debug, Deserialize, Serialize)]
-//pub struct Ipam {
-//    #[serde(rename = "gateway", skip_serializing_if = "Option::is_none")]
-//    gateway: Option<String>,
-//
-//    #[serde(rename = "subnet", skip_serializing_if = "Option::is_none")]
-//    subnet: Option<String>,
-//
-//    #[serde(rename = "ip_range", skip_serializing_if = "Option::is_none")]
-//    ip_range: Option<String>,
-//}
-//
-//#[derive(Clone, Debug, Deserialize, Serialize)]
-//#[serde(untagged)]
-//pub enum MobyNetwork {
-//    Network(Network),
-//    Name(String),
-//}
-//
-//impl MobyNetwork {
-//    pub fn name(&self) -> &str {
-//        match self {
-//            MobyNetwork::Name(name) => {
-//                        if name.is_empty() {
-//            &DEFAULT_NETWORKID
-//        } else {
-//                            name
-//        }
-//            },
-//            MobyNetwork::Network(network) => &network.name
-//        }
-//    }
-//}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MobyRuntime {
     #[serde(with = "url_serde")]
@@ -379,11 +331,6 @@ impl MobyRuntime {
     }
 
     pub fn network(&self) -> &MobyNetwork {
-//        if self.network.is_empty() {
-//            &DEFAULT_NETWORKID
-//        } else {
-//            &self.network
-//        }
         &self.network
     }
 }
@@ -578,6 +525,7 @@ pub enum ParseManualDeviceConnectionStringError {
 mod tests {
     use super::*;
     use config::{Config, File, FileFormat};
+    use edgelet_core::{Ipam, DEFAULT_NETWORKID};
     use edgelet_docker::DockerConfig;
     use std::cmp::Ordering;
     use std::fs::File as FsFile;
@@ -620,6 +568,8 @@ mod tests {
     static BAD_SETTINGS_DPS_X5092: &str = "test/linux/bad_settings.dps.x509.2.yaml";
     #[cfg(unix)]
     static GOOD_SETTINGS_EXTERNAL: &str = "test/linux/sample_settings.external.yaml";
+    #[cfg(unix)]
+    static GOOD_SETTINGS_NETWORK: &str = "test/linux/sample_settings.network.yaml";
 
     #[cfg(windows)]
     static GOOD_SETTINGS: &str = "test/windows/sample_settings.yaml";
@@ -657,6 +607,8 @@ mod tests {
     static BAD_SETTINGS_DPS_X5092: &str = "test/windows/bad_settings.dps.x509.2.yaml";
     #[cfg(windows)]
     static GOOD_SETTINGS_EXTERNAL: &str = "test/windows/sample_settings.external.yaml";
+    #[cfg(windows)]
+    static GOOD_SETTINGS_NETWORK: &str = "test/windows/sample_settings.network.yaml";
 
     fn unwrap_manual_provisioning(p: &Provisioning) -> String {
         match p {
@@ -870,6 +822,45 @@ mod tests {
     }
 
     #[test]
+    fn network_get_settings() {
+        let settings = Settings::<DockerConfig>::new(Some(Path::new(GOOD_SETTINGS_NETWORK)));
+        println!("{:?}", settings);
+        assert!(settings.is_ok());
+        let s = settings.unwrap();
+        let moby_runtime = s.moby_runtime();
+        assert_eq!(
+            moby_runtime.uri().to_owned().into_string(),
+            "http://localhost:2375/".to_string()
+        );
+
+        let network = moby_runtime.network();
+        assert_eq!(network.name(), "azure-iot-edge");
+        match network {
+            MobyNetwork::Network(moby_network) => {
+                assert_eq!(moby_network.ipv6().unwrap(), &true);
+                if let Some(ipam_config) = moby_network.ipam() {
+                    let ipam_1 = Ipam::default()
+                        .with_gateway("172.18.0.1".to_string())
+                        .with_ip_range("172.18.0.0/16".to_string())
+                        .with_subnet("172.18.0.0/16".to_string());
+                    let ipam_2 = Ipam::default()
+                        .with_gateway("2001:4898:e0:3b1:1::1".to_string())
+                        .with_ip_range("2001:4898:e0:3b1:1::/80".to_string())
+                        .with_subnet("2001:4898:e0:3b1:1::/80".to_string());
+                    let expected_ipam_config: Vec<Ipam> = vec![ipam_1, ipam_2];
+
+                    ipam_config.iter().for_each(|ipam_config| {
+                        assert_eq!(expected_ipam_config.contains(ipam_config), true);
+                    });
+                } else {
+                    panic!("Expected IPAM configuration.")
+                }
+            }
+            MobyNetwork::Name(_name) => panic!("Unexpected network configuration."),
+        };
+    }
+
+    #[test]
     fn diff_with_same_cached_returns_false() {
         let tmp_dir = TempDir::new("blah").unwrap();
         let path = tmp_dir.path().join("cache");
@@ -962,15 +953,15 @@ mod tests {
     fn network_default() {
         let moby1 = MobyRuntime {
             uri: Url::parse("http://test").unwrap(),
-            network: "".to_string(),
+            network: MobyNetwork::Name("".to_string()),
         };
-        assert_eq!(DEFAULT_NETWORKID, moby1.network());
+        assert_eq!(DEFAULT_NETWORKID, moby1.network().name());
 
         let moby2 = MobyRuntime {
             uri: Url::parse("http://test").unwrap(),
-            network: "some-network".to_string(),
+            network: MobyNetwork::Name("some-network".to_string()),
         };
-        assert_eq!("some-network", moby2.network());
+        assert_eq!("some-network", moby2.network().name());
     }
 
     #[test]

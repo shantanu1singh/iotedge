@@ -157,7 +157,6 @@ where
             req.header(http::header::USER_AGENT, &**user_agent);
         }
 
-        println!("{:?}", serialized);
         let mut req = req
             .body(hyper::Body::from(serialized))
             .expect("could not build hyper::Request");

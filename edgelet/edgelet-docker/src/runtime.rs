@@ -18,11 +18,11 @@ use url::Url;
 
 use docker::apis::client::APIClient;
 use docker::apis::configuration::Configuration;
-use docker::models::{ContainerCreateBody, InlineResponse200, NetworkConfig, Ipam};
+use docker::models::{ContainerCreateBody, InlineResponse200, Ipam, NetworkConfig};
 use edgelet_core::{
-    AuthId, Authenticator, LogOptions, Module, ModuleId, ModuleRegistry, ModuleRuntime,
-    ModuleRuntimeState, ModuleSpec, RegistryOperation, RuntimeOperation,
-    SystemInfo as CoreSystemInfo, UrlExt, MobyNetwork,
+    AuthId, Authenticator, LogOptions, MobyNetwork, Module, ModuleId, ModuleRegistry,
+    ModuleRuntime, ModuleRuntimeState, ModuleSpec, RegistryOperation, RuntimeOperation,
+    SystemInfo as CoreSystemInfo, UrlExt,
 };
 use edgelet_http::{Pid, UrlConnector};
 use edgelet_utils::{ensure_not_empty_with_context, log_failure};
@@ -83,7 +83,7 @@ impl DockerModuleRuntime {
             client: DockerClient::new(APIClient::new(configuration)),
             network_id: None,
             ipv6: false,
-            ipam: None
+            ipam: None,
         })
     }
 
@@ -112,11 +112,10 @@ impl DockerModuleRuntime {
                         config_map.insert("IPRange".to_string(), ip_range_config.to_string());
                     };
 
-                   config.push(config_map);
+                    config.push(config_map);
                 });
 
-                let ipam = Ipam::new().with_config(config).with_driver("default".to_string());
-                self.ipam = Some(ipam);
+                self.ipam = Some(Ipam::new().with_config(config));
             }
         }
 
@@ -271,7 +270,7 @@ impl ModuleRuntime for DockerModuleRuntime {
             |id| {
                 let filter = format!(r#"{{"name":{{"{}":true}}}}"#, id);
                 let client_copy = self.client.clone();
-                let enable_i_pv6 = self.ipv6.clone();
+                let enable_i_pv6 = self.ipv6;
                 let ipam = self.ipam.clone();
                 let fut = self
                     .client
@@ -279,9 +278,8 @@ impl ModuleRuntime for DockerModuleRuntime {
                     .network_list(&filter)
                     .and_then(move |existing_networks| {
                         if existing_networks.is_empty() {
-                            let mut network_config = NetworkConfig::new(id)
-                                .with_driver("bridge".to_string())
-                                .with_enable_i_pv6(enable_i_pv6);
+                            let mut network_config =
+                                NetworkConfig::new(id).with_enable_i_pv6(enable_i_pv6);
 
                             if let Some(ipam_config) = ipam {
                                 network_config.set_IPAM(ipam_config);
@@ -904,7 +902,7 @@ mod tests {
     use url::Url;
 
     use docker::models::ContainerCreateBody;
-    use edgelet_core::{ModuleId, ModuleRegistry, ModuleTop};
+    use edgelet_core::{Ipam as CoreIpam, ModuleId, ModuleRegistry, ModuleTop, Network};
 
     use crate::error::{Error, ErrorKind};
 
@@ -979,6 +977,34 @@ mod tests {
             .unwrap()
             .block_on(task)
             .unwrap();
+    }
+
+    #[test]
+    fn with_network_configuration_succeeds() {
+        let ipam = CoreIpam::default()
+            .with_gateway("172.18.0.1".to_string())
+            .with_ip_range("172.18.0.0/16".to_string())
+            .with_subnet("172.18.0.0/16".to_string());
+
+        let network_name = "my-network";
+        let ipv6 = true;
+        let network = Network::new(network_name.to_string())
+            .with_ipv6(Some(ipv6))
+            .with_ipam(Some(vec![ipam.clone()]));
+
+        let mri = DockerModuleRuntime::new(&Url::parse("http://localhost/").unwrap())
+            .unwrap()
+            .with_network_configuration(MobyNetwork::Network(network));
+
+        assert_eq!(network_name, mri.network_id.unwrap());
+        assert_eq!(ipv6, mri.ipv6);
+
+        let ipam_mri = mri.ipam.unwrap();
+        let ipam_config = ipam_mri.config().unwrap().to_owned();
+        let ipam_config_0 = ipam_config.get(0).unwrap();
+        assert_eq!(ipam_config_0["Gateway"], ipam.gateway().unwrap());
+        assert_eq!(ipam_config_0["Subnet"], ipam.subnet().unwrap());
+        assert_eq!(ipam_config_0["IPRange"], ipam.ip_range().unwrap());
     }
 
     #[test]
