@@ -1184,15 +1184,14 @@ mod tests {
             provisioning_info,
         });
         let memory_hsm = MemoryKeyStore::new();
-        let task = provisioning
-            .provision(memory_hsm.clone())
-            .then(|result| match result {
-                Ok(_) => panic!("Expected a failure."),
-                Err(err) => match err.kind() {
-                    ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidCredentialSource) => Ok::<_, Error>(()),
-                    _ => panic!("Expected error `ExternalProvisioning` with reason 'InvalidCredentialSource' but got {:?}", err),
-                },
-            });
+        let task = provisioning.provision(memory_hsm.clone()).then(|result| {
+            assert_eq!(
+                result.err().unwrap(),
+                ErrorKind::ExternalProvisioning(
+                    ExternalProvisioningErrorReason::InvalidCredentialSource
+                )
+            )
+        });
         tokio::runtime::current_thread::Runtime::new()
             .unwrap()
             .block_on(task)
@@ -1213,15 +1212,14 @@ mod tests {
             provisioning_info,
         });
         let memory_hsm = MemoryKeyStore::new();
-        let task = provisioning
-            .provision(memory_hsm.clone())
-            .then(|result| match result {
-                Ok(_) => panic!("Expected a failure."),
-                Err(err) => match err.kind() {
-                    ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidAuthenticationType) => Ok::<_, Error>(()),
-                    _ => panic!("Expected error `ExternalProvisioning` with reason 'InvalidAuthenticationType' but got {:?}", err),
-                },
-            });
+        let task = provisioning.provision(memory_hsm.clone()).then(|result| {
+            assert_eq!(
+                result.err().unwrap(),
+                ErrorKind::ExternalProvisioning(
+                    ExternalProvisioningErrorReason::InvalidAuthenticationType
+                )
+            )
+        });
         tokio::runtime::current_thread::Runtime::new()
             .unwrap()
             .block_on(task)
@@ -1242,15 +1240,14 @@ mod tests {
             provisioning_info,
         });
         let memory_hsm = MemoryKeyStore::new();
-        let task = provisioning
-            .provision(memory_hsm.clone())
-            .then(|result| match result {
-                Ok(_) => panic!("Expected a failure."),
-                Err(err) => match err.kind() {
-                    ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::ProvisioningFailure) => Ok::<_, Error>(()),
-                    _ => panic!("Expected error `ExternalProvisioning` with reason 'ProvisioningFailure' but got {:?}", err),
-                },
-            });
+        let task = provisioning.provision(memory_hsm.clone()).then(|result| {
+            assert_eq!(
+                result.err().unwrap(),
+                ErrorKind::ExternalProvisioning(
+                    ExternalProvisioningErrorReason::ProvisioningFailure
+                )
+            )
+        });
         tokio::runtime::current_thread::Runtime::new()
             .unwrap()
             .block_on(task)
