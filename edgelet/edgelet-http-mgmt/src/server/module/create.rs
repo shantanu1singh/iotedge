@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 
-use std::time::Duration;
-use std::thread;
+//use std::time::Duration;
+//use std::thread;
 use failure::ResultExt;
 use futures::future::Either;
 use futures::{Future, Stream};
@@ -110,8 +110,8 @@ where
                                         RuntimeOperation::CreateModule(name),
                                     ))?;
 
-                                thread::sleep(Duration::from_secs(600));
-                                println!("{:?}", response);
+//                                thread::sleep(Duration::from_secs(600));
+//                                println!("{:?}", response);
                                    
                                 Ok(response)
                             }))

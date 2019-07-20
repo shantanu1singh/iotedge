@@ -424,7 +424,11 @@ impl ModuleRuntime for DockerModuleRuntime {
             return Box::new(future::err(Error::from(err)));
         }
 
-        Box::new(
+        if id.eq("edgeHub") {
+            Box::new(future::ok(()))
+        }
+        else{
+                    Box::new(
             self.client
                 .container_api()
                 .container_start(&id, "")
@@ -443,6 +447,7 @@ impl ModuleRuntime for DockerModuleRuntime {
                     }
                 }),
         )
+        }
     }
 
     fn stop(&self, id: &str, wait_before_kill: Option<Duration>) -> Self::StopFuture {
