@@ -258,7 +258,8 @@ where
                 );
 
                 let credentials_info = device_provisioning_info.credentials();
-                let credentials = if let "symmetric-key" = credentials_info.auth_type() {
+                let credentials = match credentials_info.auth_type() {
+                    "symmetric-key" => {
                         match credentials_info.source() {
                             "payload" => {
                                 credentials_info.key().map_or_else(
@@ -299,12 +300,67 @@ where
                                 Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidCredentialSource)))
                             }
                         }
-                    }
-                    else {
-                        info!("External Provisioning is currently only supported for the 'symmetric-key' authentication type.");
+                    },
+                    "x509" => {
+                        match credentials_info.source() {
+                            "payload" => {
+                                let identity_cert = credentials_info.identity_cert().ok_or_else(|| {
+                                    Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityCertificateNotSpecified))
+                                })?;
+
+                                let identity_private_key = credentials_info.identity_private_key().ok_or_else(|| {
+                                    Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified))
+                                })?;
+
+//                                credentials_info.key().map_or_else(
+//                                    || {
+//                                        info!(
+//                                            "A key is expected in the response with the 'symmetric-key' authentication type and the 'source' set to 'payload'.");
+//                                        Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::SymmetricKeyNotSpecified)))
+//                                    },
+//                                    |key| {
+//                                        let decoded_key = base64::decode(&key).map_err(|_| {
+//                                            Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidSymmetricKey))
+//                                        })?;
+//
+//                                        key_activator
+//                                            .activate_identity_key(KeyIdentity::Device, "primary".to_string(), &decoded_key)
+//                                            .map_err(|err| Error::from(err.context(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::KeyActivation))))?;
+                                        Ok(Credentials {
+                                            auth_type: AuthType::X509(
+                                                X509Credential {
+                                                    identity_cert: identity_cert.to_string(),
+                                                    identity_private_key: identity_private_key.to_string(),
+                                                }),
+                                            source: CredentialSource::Hsm,
+                                        })
+//                                    })
+                            },
+                            "hsm" => Ok(Credentials {
+                                auth_type: AuthType::X509(
+                                    X509Credential {
+                                        identity_cert: credentials_info.identity_cert().unwrap_or("").to_string(),
+                                        identity_private_key: credentials_info.identity_private_key().unwrap_or("").to_string(),
+                                    }),
+                                source: CredentialSource::Hsm,
+                            }),
+                            _ => {
+                                info!(
+                                    "Unexpected value of credential source \"{}\" received from external environment.",
+                                    credentials_info.source()
+                                );
+                                Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidCredentialSource)))
+                            }
+                        }
+                    },
+                    _ => {
+                        info!(
+                            "Unexpected value of authentication type \"{}\" received from external environment.",
+                            credentials_info.source()
+                        );
                         Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidAuthenticationType)))
-                        // TODO: implement
-                    }?;
+                    }
+                }?;
 
                 Ok(ProvisioningResult {
                     device_id: device_provisioning_info.device_id().to_string(),

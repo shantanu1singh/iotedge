@@ -199,6 +199,8 @@ pub enum ExternalProvisioningErrorReason {
     HsmKeyRetrieval,
     InvalidAuthenticationType,
     InvalidCredentials,
+    InvalidIdentityCertificate,
+    InvalidIdentityPrivateKey,
     Provisioning,
 }
 
@@ -368,6 +370,16 @@ impl fmt::Display for ExternalProvisioningErrorReason {
             ExternalProvisioningErrorReason::InvalidCredentials => write!(
                 f,
                 "Invalid credentials retrieved from the external environment."
+            ),
+
+            ExternalProvisioningErrorReason::InvalidIdentityCertificate => write!(
+                f,
+                "Invalid identity certificate retrieved from the external environment."
+            ),
+
+            ExternalProvisioningErrorReason::InvalidIdentityPrivateKey => write!(
+                f,
+                "Invalid identity private key retrieved from the external environment."
             ),
 
             ExternalProvisioningErrorReason::Provisioning => {
