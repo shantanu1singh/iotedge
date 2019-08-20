@@ -56,6 +56,13 @@ pub struct X509Credential {
 }
 
 impl X509Credential {
+    pub fn new(identity_cert: String, identity_private_key: String) -> Self {
+        X509Credential {
+            identity_cert,
+            identity_private_key,
+        }
+    }
+
     pub fn identity_cert(&self) -> &str {
         self.identity_cert.as_str()
     }
@@ -247,13 +254,12 @@ where
         self,
         key_activator: Self::Hsm,
     ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send> {
-
         fn provision_symmetric_key<H>(
             external_provisioning_credentials: &ExternalProvisioningCredentials,
             mut key_activator: H,
         ) -> Result<Credentials, Error>
-            where
-                H: Activate + KeyStore,
+        where
+            H: Activate + KeyStore,
         {
             match external_provisioning_credentials.source() {
                 "payload" => {
@@ -302,29 +308,41 @@ where
         ) -> Result<Credentials, Error> {
             match external_provisioning_credentials.source() {
                 "payload" => {
-                    let identity_cert = external_provisioning_credentials.identity_cert().ok_or_else(|| {
-                        Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityCertificateNotSpecified))
-                    })?;
+                    let identity_cert = external_provisioning_credentials
+                        .identity_cert()
+                        .ok_or_else(|| {
+                            Error::from(ErrorKind::ExternalProvisioning(
+                                ExternalProvisioningErrorReason::IdentityCertificateNotSpecified,
+                            ))
+                        })?;
 
-                    let identity_private_key = external_provisioning_credentials.identity_private_key().ok_or_else(|| {
-                        Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified))
-                    })?;
+                    let identity_private_key = external_provisioning_credentials
+                        .identity_private_key()
+                        .ok_or_else(|| {
+                            Error::from(ErrorKind::ExternalProvisioning(
+                                ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified,
+                            ))
+                        })?;
 
                     Ok(Credentials {
-                        auth_type: AuthType::X509(
-                            X509Credential {
-                                identity_cert: identity_cert.to_string(),
-                                identity_private_key: identity_private_key.to_string(),
-                            }),
+                        auth_type: AuthType::X509(X509Credential {
+                            identity_cert: identity_cert.to_string(),
+                            identity_private_key: identity_private_key.to_string(),
+                        }),
                         source: CredentialSource::Payload,
                     })
-                },
+                }
                 "hsm" => Ok(Credentials {
-                    auth_type: AuthType::X509(
-                        X509Credential {
-                            identity_cert: external_provisioning_credentials.identity_cert().unwrap_or("").to_string(),
-                            identity_private_key: external_provisioning_credentials.identity_private_key().unwrap_or("").to_string(),
-                        }),
+                    auth_type: AuthType::X509(X509Credential {
+                        identity_cert: external_provisioning_credentials
+                            .identity_cert()
+                            .unwrap_or("")
+                            .to_string(),
+                        identity_private_key: external_provisioning_credentials
+                            .identity_private_key()
+                            .unwrap_or("")
+                            .to_string(),
+                    }),
                     source: CredentialSource::Hsm,
                 }),
                 _ => {
@@ -332,7 +350,9 @@ where
                         "Unexpected value of credential source \"{}\" received from external environment.",
                         external_provisioning_credentials.source()
                     );
-                    Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidCredentialSource)))
+                    Err(Error::from(ErrorKind::ExternalProvisioning(
+                        ExternalProvisioningErrorReason::InvalidCredentialSource,
+                    )))
                 }
             }
         }
@@ -1320,18 +1340,15 @@ mod tests {
         let mut credentials = Credentials::new("x509".to_string(), "payload".to_string());
 
         let hub_name = "TestHub";
-        let device_id= "TestDevice";
+        let device_id = "TestDevice";
         let identity_cert_val = "cGFzczEyMzQ=";
         let identity_private_key_val = "SGVsbG8=";
 
         credentials.set_identity_cert(identity_cert_val.to_string());
         credentials.set_identity_private_key(identity_private_key_val.to_string());
 
-        let provisioning_info = DeviceProvisioningInfo::new(
-            hub_name.to_string(),
-            device_id.to_string(),
-            credentials,
-        );
+        let provisioning_info =
+            DeviceProvisioningInfo::new(hub_name.to_string(), device_id.to_string(), credentials);
 
         let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
             error: None,
@@ -1373,33 +1390,28 @@ mod tests {
         let mut credentials = Credentials::new("x509".to_string(), "payload".to_string());
 
         let hub_name = "TestHub";
-        let device_id= "TestDevice";
+        let device_id = "TestDevice";
         let identity_private_key_val = "SGVsbG8=";
 
         credentials.set_identity_private_key(identity_private_key_val.to_string());
 
-        let provisioning_info = DeviceProvisioningInfo::new(
-            hub_name.to_string(),
-            device_id.to_string(),
-            credentials,
-        );
+        let provisioning_info =
+            DeviceProvisioningInfo::new(hub_name.to_string(), device_id.to_string(), credentials);
 
         let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
             error: None,
             provisioning_info,
         });
         let memory_hsm = MemoryKeyStore::new();
-        let task = provisioning
-            .provision(memory_hsm.clone())
-            .then(|result| {
-                assert_eq!(
-                    result.unwrap_err().kind(),
-                    &ErrorKind::ExternalProvisioning(
-                        ExternalProvisioningErrorReason::IdentityCertificateNotSpecified
-                    )
-                );
-                Ok::<_, Error>(())
-            });
+        let task = provisioning.provision(memory_hsm.clone()).then(|result| {
+            assert_eq!(
+                result.unwrap_err().kind(),
+                &ErrorKind::ExternalProvisioning(
+                    ExternalProvisioningErrorReason::IdentityCertificateNotSpecified
+                )
+            );
+            Ok::<_, Error>(())
+        });
         tokio::runtime::current_thread::Runtime::new()
             .unwrap()
             .block_on(task)
@@ -1411,33 +1423,28 @@ mod tests {
         let mut credentials = Credentials::new("x509".to_string(), "payload".to_string());
 
         let hub_name = "TestHub";
-        let device_id= "TestDevice";
+        let device_id = "TestDevice";
         let identity_cert_val = "cGFzczEyMzQ=";
 
         credentials.set_identity_cert(identity_cert_val.to_string());
 
-        let provisioning_info = DeviceProvisioningInfo::new(
-            hub_name.to_string(),
-            device_id.to_string(),
-            credentials,
-        );
+        let provisioning_info =
+            DeviceProvisioningInfo::new(hub_name.to_string(), device_id.to_string(), credentials);
 
         let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
             error: None,
             provisioning_info,
         });
         let memory_hsm = MemoryKeyStore::new();
-        let task = provisioning
-            .provision(memory_hsm.clone())
-            .then(|result| {
-                assert_eq!(
-                    result.unwrap_err().kind(),
-                    &ErrorKind::ExternalProvisioning(
-                        ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified
-                    )
-                );
-                Ok::<_, Error>(())
-            });
+        let task = provisioning.provision(memory_hsm.clone()).then(|result| {
+            assert_eq!(
+                result.unwrap_err().kind(),
+                &ErrorKind::ExternalProvisioning(
+                    ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified
+                )
+            );
+            Ok::<_, Error>(())
+        });
         tokio::runtime::current_thread::Runtime::new()
             .unwrap()
             .block_on(task)
@@ -1449,18 +1456,15 @@ mod tests {
         let mut credentials = Credentials::new("x509".to_string(), "hsm".to_string());
 
         let hub_name = "TestHub";
-        let device_id= "TestDevice";
+        let device_id = "TestDevice";
         let identity_cert_val = "/certs/identity_cert.pem";
         let identity_private_key_val = "/certs/identity_private_key.pem";
 
         credentials.set_identity_cert(identity_cert_val.to_string());
         credentials.set_identity_private_key(identity_private_key_val.to_string());
 
-        let provisioning_info = DeviceProvisioningInfo::new(
-            hub_name.to_string(),
-            device_id.to_string(),
-            credentials,
-        );
+        let provisioning_info =
+            DeviceProvisioningInfo::new(hub_name.to_string(), device_id.to_string(), credentials);
 
         let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
             error: None,
@@ -1502,13 +1506,10 @@ mod tests {
         let credentials = Credentials::new("x509".to_string(), "hsm".to_string());
 
         let hub_name = "TestHub";
-        let device_id= "TestDevice";
+        let device_id = "TestDevice";
 
-        let provisioning_info = DeviceProvisioningInfo::new(
-            hub_name.to_string(),
-            device_id.to_string(),
-            credentials,
-        );
+        let provisioning_info =
+            DeviceProvisioningInfo::new(hub_name.to_string(), device_id.to_string(), credentials);
 
         let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
             error: None,

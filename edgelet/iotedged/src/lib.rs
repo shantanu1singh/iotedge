@@ -216,6 +216,7 @@ enum ProvisioningAuthMethod {
     SharedAccessKey,
 }
 
+#[derive(Debug)]
 struct IdentityCertificateData {
     common_name: String,
     thumbprint: String,
@@ -504,7 +505,9 @@ where
                             ))?;
 
                         let (hyper_client, device_cert_identity_data) = match credentials.source() {
-                            CredentialSource::Payload => prepare_external_provision_x509_payload(&x509),
+                            CredentialSource::Payload => {
+                                prepare_external_provision_x509_payload(&x509)
+                            }
                             CredentialSource::Hsm => {
                                 prepare_external_provision_x509_hsm(&x509, &hsm_lock)
                             }
@@ -1635,7 +1638,8 @@ fn external_provision_x509(
         cert_thumbprint,
         provisioning_result.hub_name(),
         provisioning_result.device_id(),
-    ).context(ErrorKind::Initialize(
+    )
+    .context(ErrorKind::Initialize(
         InitializeErrorReason::ExternalProvisioningClient(
             ExternalProvisioningErrorReason::HybridKeyPreparation,
         ),
@@ -3210,5 +3214,84 @@ mod tests {
             .path()
             .join(EDGE_HYBRID_IDENTITY_MASTER_KEY_IV_FILENAME)
             .exists());
+    }
+
+    static TEST_RSA_CERT: &str = "-----BEGIN CERTIFICATE-----\nMIIDRzCCAi8CFFzhnP0XOonzk9kOmxmcKx+8sYa8MA0GCSqGSIb3DQEBCwUAMGAxCzAJBgNVBAYTAlVTMQswCQYDVQQIDAJXQTEQMA4GA1UEBwwHUmVkbW9uZDEQMA4GA1UECgwHQ29tcGFueTEQMA4GA1UECwwHT3JnVW5pdDEOMAwGA1UEAwwFdGVzdDIwHhcNMTkwODIwMjE0OTE3WhcNMjAwODE5MjE0OTE3WjBgMQswCQYDVQQGEwJVUzELMAkGA1UECAwCV0ExEDAOBgNVBAcMB1JlZG1vbmQxEDAOBgNVBAoMB0NvbXBhbnkxEDAOBgNVBAsMB09yZ1VuaXQxDjAMBgNVBAMMBXRlc3QyMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2UEeIu42CaUPc7Z8YxesayNmexXZu+AEc8uobOlKwZx+LgC2j4WElmcgyFLpEe0X+qbJjbFHkmqyzqSIFPJEqlq4crkBAY62qBPGQtskR+lhf4HtWuechwnpRG82ZS/0+fLRGCB8dS1+dFtSsNw9cCLXBjaxR0Gini66zwE7j5WvboH0N5ZogtdCEPemlo3+/vqOe5T311fRP9esvXFBE/d7NvsDNeSoryapf7mBMEsRUlHp0hQZgSRrPkiOgViDJUNsxE4BzqJPaMOd37sZyBMyWaCt+2E1goSlCHMtwQ9wqzsHlL41PLe113MR2SWP8MU1vB2ut46R6WnpawreawIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQCdbZ6Q7R3vOOI+l0tDBvg400Q7aOs/S8iFLiVtg/pFKAzQa0kqYLDObHLR/QWh3E1pGE+qd88SUHM52p53vmWQ8ImZgK2lsSdWdzptse0nZ/D0RowoIC6kr7MBpvgaH/VKYGkxO8HRyC6LG9mcEEs4iy6PG6Xw2ZO0Jf/W1GM1suCgoU2I3DeYEEi9wTDwC7xzy5v/94bMOYd7wPUioFomXAFmmXJ5TQ34N90d5L/Hpm+3YMxtmbUBtkBd/fual2K4BDjMQezJpVUZhqA7eIc6QAW+unT42jW+caa8q94eWXYH1sP56TflSGcQchF519lsAQ1FqpkyRg4kP0BpdhQa\n-----END CERTIFICATE-----";
+    static TEST_RSA_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpQIBAAKCAQEA2UEeIu42CaUPc7Z8YxesayNmexXZu+AEc8uobOlKwZx+LgC2j4WElmcgyFLpEe0X+qbJjbFHkmqyzqSIFPJEqlq4crkBAY62qBPGQtskR+lhf4HtWuechwnpRG82ZS/0+fLRGCB8dS1+dFtSsNw9cCLXBjaxR0Gini66zwE7j5WvboH0N5ZogtdCEPemlo3+/vqOe5T311fRP9esvXFBE/d7NvsDNeSoryapf7mBMEsRUlHp0hQZgSRrPkiOgViDJUNsxE4BzqJPaMOd37sZyBMyWaCt+2E1goSlCHMtwQ9wqzsHlL41PLe113MR2SWP8MU1vB2ut46R6WnpawreawIDAQABAoIBAQCtIBAk49EaFHfgzP4IdTgH1Jj44uu0pIrHv/ZCfBH/gXansBfK/SowNJRSLofeqiJesoSRLkGLsw00ULbEgl8npc2wVi8wD4sNG1z1r+4UhC0Wz/HWbBU3IzXJPBqLvhCpEc+AO3sSYaOQk6msmIU5E/pn0DOrRemRxklFZoURIE3uNmfKXlrse1U/zG0ZNQqM5FEvqdub7uFP5hS98Awcc7UDEDczYfewwqyduOxqSH+gNQjO7RtjMja8pazo7EGDmAlC7ybDxo+RSESKMLeZyQaS34cViRYV6x6qVhXFvs2TH5LhY34H+NI71kCLcnSmnEYvSr1FkkyJmvC/EskBAoGBAPfIvXkBJCu7OE7eTQAP/YDQZ5+oJQBJktDPpNg8I7brVzHvnk4fGSC6vORPu8DDOSUyU90X3sbK5ua5LQcKAMeIZDpJp9uxmUZ1r81CuJgUh/YWWw9Iu4+5/+UdJbio5J5MfnkLV7m0rn3coIUJdkCWWxzDCfmS/dudW5drs0KBAoGBAOB1O4No4r+gSDt9cPdAWrN0q9qHAxwjL5OvwRWDeHXPAFOFFxl9tXtsCBlFq2ZN4T4L4bZCNgSCytG3GYMDKam4wYHdby+LgxC0fb1+aTxwvjpOs942BWrPE4TC3QcT5lsWoR25r9E7vTqanHN/32MStJUZo/T7tJacpSsrb9LrAoGBAKC89jzTArXjw8lV6DmMJfU0PKSTnT0sfTM8IEGt8bUtwejA+r7O6awTt4mcN736Zs28ci7Q11G6OkOeCJmyYYMO9YXiViPsd/P/UEYlbD4rw29eXT/y/Mll7ZyhZeD+nyAZm0nGk+gCT9eSEgd7ddy8LOrhk0z1j/yxfcMiuK0BAoGBAJOmqpKEIXzazAlOOEx9aezY19+1pqcQwlBNch9bz5b3p4hJaWucVRCufRlayihPHNc666yAG5aWDyMrZj3Xi8WYwrpR1r0Y8gvAH2LS0BkxNQGYGhwXvzKGq5lOsiTgw0yyMyQhrPVfbdgqMraLrIA4os/eAQu7tAzLWJ9wQGwnAoGAV0GcCmmi5mXA6D80PaefiS2GzkHOYq8itiJ0f3pSllnpaJ0258FLhGMkWWipskWgLrpV66AIYNOp4F7y5A52IoaXtds7D89qWXCv6I8Ku4LGrOIX4rS31punsnyyzXjIl6goXMJxh76Naam62S+N1UxzPlTaS/VIHEdj+yvKecs=\n-----END RSA PRIVATE KEY-----";
+
+    #[test]
+    fn prepare_external_provision_x509_payload_success() {
+        let cert_data = base64::encode(TEST_RSA_CERT);
+        let key_data = base64::encode(TEST_RSA_KEY);
+        let x509_credential = X509Credential::new(cert_data.clone(), key_data);
+
+        let common_name = "test2";
+        let thumbprint = "7a78698ce2c21c87962e6947e5ab1bb8858c2efe3c70dd3cf20decce1bc629f1";
+
+        let (_hyper_client, device_cert_identity_data) = prepare_external_provision_x509_payload(
+            &x509_credential,
+        )
+        .expect("Preparation for X509 based external provisioning with cert in payload failed");
+
+        assert_eq!(device_cert_identity_data.common_name.as_str(), common_name);
+        assert_eq!(device_cert_identity_data.thumbprint.as_str(), thumbprint);
+    }
+
+    #[test]
+    fn prepare_external_provision_x509_payload_invalid_cert_base64() {
+        let cert_data = TEST_RSA_CERT;
+        let key_data = base64::encode(TEST_RSA_KEY);
+        let x509_credential = X509Credential::new(cert_data.to_string(), key_data);
+
+        let err = prepare_external_provision_x509_payload(&x509_credential).unwrap_err();
+        assert_eq!(
+            err.kind(),
+            &ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
+                ExternalProvisioningErrorReason::InvalidIdentityCertificate,
+            ),)
+        );
+    }
+
+    #[test]
+    fn prepare_external_provision_x509_payload_invalid_key_base64() {
+        let cert_data = base64::encode(TEST_RSA_CERT);
+        let key_data = TEST_RSA_KEY;
+        let x509_credential = X509Credential::new(cert_data, key_data.to_string());
+
+        let err = prepare_external_provision_x509_payload(&x509_credential).unwrap_err();
+        assert_eq!(
+            err.kind(),
+            &ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
+                ExternalProvisioningErrorReason::InvalidIdentityPrivateKey,
+            ),)
+        );
+    }
+
+    #[test]
+    fn prepare_external_provision_x509_payload_invalid_cert_data() {
+        let cert_data = "VGVzdENlcnQ=".to_string();
+        let key_data = base64::encode(TEST_RSA_KEY);
+        let x509_credential = X509Credential::new(cert_data, key_data);
+
+        let err = prepare_external_provision_x509_payload(&x509_credential).unwrap_err();
+        assert_eq!(
+            err.kind(),
+            &ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
+                ExternalProvisioningErrorReason::InvalidIdentityCertificate,
+            ),)
+        );
+    }
+
+    #[test]
+    fn prepare_external_provision_x509_payload_invalid_key_data() {
+        let cert_data = base64::encode(TEST_RSA_CERT);
+        let key_data = "VGVzdENlcnQ=".to_string();
+        let x509_credential = X509Credential::new(cert_data, key_data);
+
+        let err = prepare_external_provision_x509_payload(&x509_credential).unwrap_err();
+        assert_eq!(
+            err.kind(),
+            &ErrorKind::Initialize(InitializeErrorReason::HttpClient)
+        );
     }
 }

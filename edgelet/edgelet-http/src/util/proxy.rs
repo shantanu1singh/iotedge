@@ -7,7 +7,7 @@ use super::super::PemCertificate;
 use super::hyperwrap::Client;
 use crate::error::Error;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MaybeProxyClient {
     client: Client,
 }
