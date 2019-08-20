@@ -515,12 +515,7 @@ where
                             &provisioning_result,
                             &hybrid_identity_key,
                             device_cert_identity_data.thumbprint.to_string(),
-                        )
-                        .context(ErrorKind::Initialize(
-                            InitializeErrorReason::ExternalProvisioningClient(
-                                ExternalProvisioningErrorReason::ClientInitialization,
-                            ),
-                        ))?;
+                        )?;
 
                         start_edgelet!(
                             key_store,
@@ -641,11 +636,8 @@ fn prepare_external_provision_x509_payload(
     ))?;
 
     let pem = PemCertificate::new(cert_bytes, Some(pk_bytes), None, None);
-    let hyper_client = MaybeProxyClient::new(get_proxy_uri(None)?, Some(pem), None).context(
-        ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
-            ExternalProvisioningErrorReason::ClientInitialization,
-        )),
-    )?;
+    let hyper_client = MaybeProxyClient::new(get_proxy_uri(None)?, Some(pem), None)
+        .context(ErrorKind::Initialize(InitializeErrorReason::HttpClient))?;
 
     let common_name = native_cert
         .subject_name()
@@ -653,7 +645,7 @@ fn prepare_external_provision_x509_payload(
         .next()
         .ok_or_else(|| {
             ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
-                ExternalProvisioningErrorReason::ClientInitialization,
+                ExternalProvisioningErrorReason::InvalidIdentityCertificate,
             ))
         })?;
 
@@ -661,7 +653,7 @@ fn prepare_external_provision_x509_payload(
         .digest(OpenSSLHash::MessageDigest::sha256())
         .context(ErrorKind::Initialize(
             InitializeErrorReason::ExternalProvisioningClient(
-                ExternalProvisioningErrorReason::ClientInitialization,
+                ExternalProvisioningErrorReason::InvalidIdentityCertificate,
             ),
         ))?;
 
@@ -1643,7 +1635,11 @@ fn external_provision_x509(
         &cert_thumbprint,
         provisioning_result.hub_name(),
         provisioning_result.device_id(),
-    )?;
+    ).context(ErrorKind::Initialize(
+        InitializeErrorReason::ExternalProvisioningClient(
+            ExternalProvisioningErrorReason::HybridKeyPreparation,
+        ),
+    ))?;
     Ok((derived_key_store, hybrid_derived_key))
 }
 

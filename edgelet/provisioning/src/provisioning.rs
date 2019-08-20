@@ -21,6 +21,7 @@ use edgelet_hsm::tpm::{TpmKey, TpmKeyStore};
 use edgelet_http::client::{Client as HttpClient, ClientImpl};
 use edgelet_http_external_provisioning::ExternalProvisioningInterface;
 use edgelet_utils::log_failure;
+use external_provisioning::models::Credentials as ExternalProvisioningCredentials;
 use hsm::TpmKey as HsmTpmKey;
 use log::{debug, Level};
 use sha2::{Digest, Sha256};
@@ -244,8 +245,98 @@ where
 
     fn provision(
         self,
-        mut key_activator: Self::Hsm,
+        key_activator: Self::Hsm,
     ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send> {
+
+        fn provision_symmetric_key<H>(
+            external_provisioning_credentials: &ExternalProvisioningCredentials,
+            mut key_activator: H,
+        ) -> Result<Credentials, Error>
+            where
+                H: Activate + KeyStore,
+        {
+            match external_provisioning_credentials.source() {
+                "payload" => {
+                    external_provisioning_credentials.key().map_or_else(
+                        || {
+                            info!(
+                                "A key is expected in the response with the 'symmetric-key' authentication type and the 'source' set to 'payload'.");
+                            Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::SymmetricKeyNotSpecified)))
+                        },
+                        |key| {
+                            let decoded_key = base64::decode(&key).map_err(|_| {
+                                Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidSymmetricKey))
+                            })?;
+
+                            key_activator
+                                .activate_identity_key(KeyIdentity::Device, "primary".to_string(), &decoded_key)
+                                .map_err(|err| Error::from(err.context(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::KeyActivation))))?;
+                            Ok(Credentials {
+                                auth_type: AuthType::SymmetricKey(
+                                    SymmetricKeyCredential {
+                                        key: Some(decoded_key),
+                                    }),
+                                source: CredentialSource::Payload,
+                            })
+                        })
+                },
+                "hsm" => Ok(Credentials {
+                    auth_type: AuthType::SymmetricKey(
+                        SymmetricKeyCredential {
+                            key: None,
+                        }),
+                    source: CredentialSource::Hsm,
+                }),
+                _ => {
+                    info!(
+                        "Unexpected value of credential source \"{}\" received from external environment.",
+                        external_provisioning_credentials.source()
+                    );
+                    Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidCredentialSource)))
+                }
+            }
+        }
+
+        fn provision_x509(
+            external_provisioning_credentials: &ExternalProvisioningCredentials,
+        ) -> Result<Credentials, Error> {
+            match external_provisioning_credentials.source() {
+                "payload" => {
+                    let identity_cert = external_provisioning_credentials.identity_cert().ok_or_else(|| {
+                        Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityCertificateNotSpecified))
+                    })?;
+
+                    let identity_private_key = external_provisioning_credentials.identity_private_key().ok_or_else(|| {
+                        Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified))
+                    })?;
+
+                    Ok(Credentials {
+                        auth_type: AuthType::X509(
+                            X509Credential {
+                                identity_cert: identity_cert.to_string(),
+                                identity_private_key: identity_private_key.to_string(),
+                            }),
+                        source: CredentialSource::Payload,
+                    })
+                },
+                "hsm" => Ok(Credentials {
+                    auth_type: AuthType::X509(
+                        X509Credential {
+                            identity_cert: external_provisioning_credentials.identity_cert().unwrap_or("").to_string(),
+                            identity_private_key: external_provisioning_credentials.identity_private_key().unwrap_or("").to_string(),
+                        }),
+                    source: CredentialSource::Hsm,
+                }),
+                _ => {
+                    info!(
+                        "Unexpected value of credential source \"{}\" received from external environment.",
+                        external_provisioning_credentials.source()
+                    );
+                    Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidCredentialSource)))
+                }
+            }
+        }
+
         let result = self
             .client
             .get_device_provisioning_information()
@@ -260,83 +351,10 @@ where
                 let credentials_info = device_provisioning_info.credentials();
                 let credentials = match credentials_info.auth_type() {
                     "symmetric-key" => {
-                        match credentials_info.source() {
-                            "payload" => {
-                                credentials_info.key().map_or_else(
-                                    || {
-                                        info!(
-                                            "A key is expected in the response with the 'symmetric-key' authentication type and the 'source' set to 'payload'.");
-                                        Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::SymmetricKeyNotSpecified)))
-                                    },
-                                    |key| {
-                                        let decoded_key = base64::decode(&key).map_err(|_| {
-                                            Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidSymmetricKey))
-                                        })?;
-
-                                        key_activator
-                                            .activate_identity_key(KeyIdentity::Device, "primary".to_string(), &decoded_key)
-                                            .map_err(|err| Error::from(err.context(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::KeyActivation))))?;
-                                        Ok(Credentials {
-                                            auth_type: AuthType::SymmetricKey(
-                                                SymmetricKeyCredential {
-                                                    key: Some(decoded_key),
-                                                }),
-                                            source: CredentialSource::Payload,
-                                        })
-                                    })
-                            },
-                            "hsm" => Ok(Credentials {
-                                auth_type: AuthType::SymmetricKey(
-                                    SymmetricKeyCredential {
-                                        key: None,
-                                    }),
-                                source: CredentialSource::Hsm,
-                            }),
-                            _ => {
-                                info!(
-                                    "Unexpected value of credential source \"{}\" received from external environment.",
-                                    credentials_info.source()
-                                );
-                                Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidCredentialSource)))
-                            }
-                        }
+                        provision_symmetric_key(credentials_info, key_activator)
                     },
                     "x509" => {
-                        match credentials_info.source() {
-                            "payload" => {
-                                let identity_cert = credentials_info.identity_cert().ok_or_else(|| {
-                                    Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityCertificateNotSpecified))
-                                })?;
-
-                                let identity_private_key = credentials_info.identity_private_key().ok_or_else(|| {
-                                    Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified))
-                                })?;
-
-                                Ok(Credentials {
-                                    auth_type: AuthType::X509(
-                                        X509Credential {
-                                            identity_cert: identity_cert.to_string(),
-                                            identity_private_key: identity_private_key.to_string(),
-                                        }),
-                                    source: CredentialSource::Payload,
-                                })
-                            },
-                            "hsm" => Ok(Credentials {
-                                auth_type: AuthType::X509(
-                                    X509Credential {
-                                        identity_cert: credentials_info.identity_cert().unwrap_or("").to_string(),
-                                        identity_private_key: credentials_info.identity_private_key().unwrap_or("").to_string(),
-                                    }),
-                                source: CredentialSource::Hsm,
-                            }),
-                            _ => {
-                                info!(
-                                    "Unexpected value of credential source \"{}\" received from external environment.",
-                                    credentials_info.source()
-                                );
-                                Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidCredentialSource)))
-                            }
-                        }
+                        provision_x509(credentials_info)
                     },
                     _ => {
                         info!(

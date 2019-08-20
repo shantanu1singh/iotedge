@@ -197,6 +197,7 @@ pub enum ExternalProvisioningErrorReason {
     ClientInitialization,
     HsmInitialization,
     HsmKeyRetrieval,
+    HybridKeyPreparation,
     InvalidAuthenticationType,
     InvalidCredentials,
     InvalidIdentityCertificate,
@@ -361,6 +362,10 @@ impl fmt::Display for ExternalProvisioningErrorReason {
 
             ExternalProvisioningErrorReason::HsmKeyRetrieval => {
                 write!(f, "Could not retrieve the device's key from the HSM.")
+            }
+
+            ExternalProvisioningErrorReason::HybridKeyPreparation => {
+                write!(f, "Could not prepare the hybrid key.")
             }
 
             ExternalProvisioningErrorReason::InvalidAuthenticationType => {
