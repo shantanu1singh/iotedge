@@ -36,7 +36,7 @@ use futures::{future, Future};
 use hyper::server::conn::Http;
 use hyper::{Body, Request, Uri};
 use log::{debug, info, Level};
-use openssl::{hash as OpenSSLHash, nid as OpenSSLNid, x509::X509 as OpenSSLX509};
+use openssl::{hash as OpenSslHash, nid as OpenSslNid, x509::X509 as OpenSslX509};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -506,7 +506,7 @@ where
                         let (hyper_client, device_cert_identity_data) = match credentials.source() {
                             CredentialSource::Payload => prepare_external_provision_x509_payload(&x509),
                             CredentialSource::Hsm => {
-                                prepare_external_provision_x509_hsm(&x509, hsm_lock.clone())
+                                prepare_external_provision_x509_hsm(&x509, &hsm_lock)
                             }
                         }?;
 
@@ -514,7 +514,7 @@ where
                         let (key_store, root_key) = external_provision_x509(
                             &provisioning_result,
                             &hybrid_identity_key,
-                            device_cert_identity_data.thumbprint.to_string(),
+                            device_cert_identity_data.thumbprint.as_str(),
                         )?;
 
                         start_edgelet!(
@@ -629,7 +629,7 @@ fn prepare_external_provision_x509_payload(
         ),
     ))?;
 
-    let native_cert = OpenSSLX509::from_pem(cert_bytes.as_ref()).context(ErrorKind::Initialize(
+    let native_cert = OpenSslX509::from_pem(cert_bytes.as_ref()).context(ErrorKind::Initialize(
         InitializeErrorReason::ExternalProvisioningClient(
             ExternalProvisioningErrorReason::InvalidIdentityCertificate,
         ),
@@ -641,7 +641,7 @@ fn prepare_external_provision_x509_payload(
 
     let common_name = native_cert
         .subject_name()
-        .entries_by_nid(OpenSSLNid::Nid::COMMONNAME)
+        .entries_by_nid(OpenSslNid::Nid::COMMONNAME)
         .next()
         .ok_or_else(|| {
             ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
@@ -650,7 +650,7 @@ fn prepare_external_provision_x509_payload(
         })?;
 
     let digest = native_cert
-        .digest(OpenSSLHash::MessageDigest::sha256())
+        .digest(OpenSslHash::MessageDigest::sha256())
         .context(ErrorKind::Initialize(
             InitializeErrorReason::ExternalProvisioningClient(
                 ExternalProvisioningErrorReason::InvalidIdentityCertificate,
@@ -668,7 +668,7 @@ fn prepare_external_provision_x509_payload(
 
 fn prepare_external_provision_x509_hsm(
     x509: &X509Credential,
-    hsm_lock: Arc<HsmLock>,
+    hsm_lock: &Arc<HsmLock>,
 ) -> Result<(MaybeProxyClient, IdentityCertificateData), Error> {
     env::set_var(DPS_DEVICE_ID_CERT_ENV_KEY, x509.identity_cert());
     env::set_var(DPS_DEVICE_ID_KEY_ENV_KEY, x509.identity_private_key());
@@ -1624,7 +1624,7 @@ fn external_provision_tpm(
 fn external_provision_x509(
     provisioning_result: &ProvisioningResult,
     hybrid_identity_key: &[u8],
-    cert_thumbprint: String,
+    cert_thumbprint: &str,
 ) -> Result<(DerivedKeyStore<MemoryKey>, MemoryKey), Error> {
     let memory_key = MemoryKey::new(hybrid_identity_key);
     let mut memory_hsm = MemoryKeyStore::new();
@@ -1632,7 +1632,7 @@ fn external_provision_x509(
 
     let (derived_key_store, hybrid_derived_key) = prepare_derived_hybrid_key(
         &memory_hsm,
-        &cert_thumbprint,
+        cert_thumbprint,
         provisioning_result.hub_name(),
         provisioning_result.device_id(),
     ).context(ErrorKind::Initialize(
@@ -1640,6 +1640,7 @@ fn external_provision_x509(
             ExternalProvisioningErrorReason::HybridKeyPreparation,
         ),
     ))?;
+
     Ok((derived_key_store, hybrid_derived_key))
 }
 

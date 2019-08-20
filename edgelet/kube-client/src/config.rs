@@ -188,6 +188,7 @@ fn identity_from_cert_key(user_name: &str, cert: &[u8], key: &[u8]) -> Result<Id
     // creates a dependency on OpenSSL.
     let key = PKey::private_key_from_pem(&key)?;
     let cert = X509::from_pem(&cert)?;
+
     let pkcs_cert = Pkcs12::builder().build("", user_name, &key, &cert)?;
     Ok(Identity::from_pkcs12(&pkcs_cert.to_der()?, "")?)
 }

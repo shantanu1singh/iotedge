@@ -1258,8 +1258,8 @@ mod tests {
     }
 
     #[test]
-    fn external_get_provisioning_info_x509_unsupported() {
-        let credentials = Credentials::new("x509".to_string(), "payload".to_string());
+    fn external_get_provisioning_info_invalid_authentication_type() {
+        let credentials = Credentials::new("xyz".to_string(), "payload".to_string());
         let provisioning_info = DeviceProvisioningInfo::new(
             "TestHub".to_string(),
             "TestDevice".to_string(),
@@ -1316,28 +1316,229 @@ mod tests {
     }
 
     #[test]
-    fn test1() {
-        let credentials = Credentials::new("symmetric-key".to_string(), "payload".to_string());
+    fn external_get_provisioning_info_x509_payload_success() {
+        let mut credentials = Credentials::new("x509".to_string(), "payload".to_string());
+
+        let hub_name = "TestHub";
+        let device_id= "TestDevice";
+        let identity_cert_val = "cGFzczEyMzQ=";
+        let identity_private_key_val = "SGVsbG8=";
+
+        credentials.set_identity_cert(identity_cert_val.to_string());
+        credentials.set_identity_private_key(identity_private_key_val.to_string());
+
         let provisioning_info = DeviceProvisioningInfo::new(
-            "TestHub".to_string(),
-            "TestDevice".to_string(),
+            hub_name.to_string(),
+            device_id.to_string(),
             credentials,
         );
 
         let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
-            error: Some(TestError {}),
+            error: None,
             provisioning_info,
         });
         let memory_hsm = MemoryKeyStore::new();
-        let task = provisioning.provision(memory_hsm.clone()).then(|result| {
-            assert_eq!(
-                result.unwrap_err().kind(),
-                &ErrorKind::ExternalProvisioning(
-                    ExternalProvisioningErrorReason::ProvisioningFailure
-                )
-            );
-            Ok::<_, Error>(())
+        let task = provisioning
+            .provision(memory_hsm.clone())
+            .then(|result| match result {
+                Ok(result) => {
+                    assert_eq!(result.hub_name.as_str(), hub_name);
+                    assert_eq!(result.device_id.as_str(), device_id);
+
+                    if let Some(credentials) = result.credentials() {
+                        assert_eq!(credentials.source(), &CredentialSource::Payload);
+
+                        if let AuthType::X509(x509) = credentials.auth_type() {
+                            assert_eq!(x509.identity_cert(), identity_cert_val);
+                            assert_eq!(x509.identity_private_key(), identity_private_key_val);
+                        } else {
+                            panic!("Unexpected authentication type.")
+                        }
+                    } else {
+                        panic!("No credentials found. This is unexpected")
+                    }
+
+                    Ok::<_, Error>(())
+                }
+                Err(err) => panic!("Unexpected {:?}", err),
+            });
+        tokio::runtime::current_thread::Runtime::new()
+            .unwrap()
+            .block_on(task)
+            .unwrap();
+    }
+
+    #[test]
+    fn external_get_provisioning_info_x509_payload_no_identity_cert_failure() {
+        let mut credentials = Credentials::new("x509".to_string(), "payload".to_string());
+
+        let hub_name = "TestHub";
+        let device_id= "TestDevice";
+        let identity_private_key_val = "SGVsbG8=";
+
+        credentials.set_identity_private_key(identity_private_key_val.to_string());
+
+        let provisioning_info = DeviceProvisioningInfo::new(
+            hub_name.to_string(),
+            device_id.to_string(),
+            credentials,
+        );
+
+        let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
+            error: None,
+            provisioning_info,
         });
+        let memory_hsm = MemoryKeyStore::new();
+        let task = provisioning
+            .provision(memory_hsm.clone())
+            .then(|result| {
+                assert_eq!(
+                    result.unwrap_err().kind(),
+                    &ErrorKind::ExternalProvisioning(
+                        ExternalProvisioningErrorReason::IdentityCertificateNotSpecified
+                    )
+                );
+                Ok::<_, Error>(())
+            });
+        tokio::runtime::current_thread::Runtime::new()
+            .unwrap()
+            .block_on(task)
+            .unwrap();
+    }
+
+    #[test]
+    fn external_get_provisioning_info_x509_payload_no_identity_private_key_failure() {
+        let mut credentials = Credentials::new("x509".to_string(), "payload".to_string());
+
+        let hub_name = "TestHub";
+        let device_id= "TestDevice";
+        let identity_cert_val = "cGFzczEyMzQ=";
+
+        credentials.set_identity_cert(identity_cert_val.to_string());
+
+        let provisioning_info = DeviceProvisioningInfo::new(
+            hub_name.to_string(),
+            device_id.to_string(),
+            credentials,
+        );
+
+        let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
+            error: None,
+            provisioning_info,
+        });
+        let memory_hsm = MemoryKeyStore::new();
+        let task = provisioning
+            .provision(memory_hsm.clone())
+            .then(|result| {
+                assert_eq!(
+                    result.unwrap_err().kind(),
+                    &ErrorKind::ExternalProvisioning(
+                        ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified
+                    )
+                );
+                Ok::<_, Error>(())
+            });
+        tokio::runtime::current_thread::Runtime::new()
+            .unwrap()
+            .block_on(task)
+            .unwrap();
+    }
+
+    #[test]
+    fn external_get_provisioning_info_x509_hsm_identity_specified_success() {
+        let mut credentials = Credentials::new("x509".to_string(), "hsm".to_string());
+
+        let hub_name = "TestHub";
+        let device_id= "TestDevice";
+        let identity_cert_val = "/certs/identity_cert.pem";
+        let identity_private_key_val = "/certs/identity_private_key.pem";
+
+        credentials.set_identity_cert(identity_cert_val.to_string());
+        credentials.set_identity_private_key(identity_private_key_val.to_string());
+
+        let provisioning_info = DeviceProvisioningInfo::new(
+            hub_name.to_string(),
+            device_id.to_string(),
+            credentials,
+        );
+
+        let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
+            error: None,
+            provisioning_info,
+        });
+        let memory_hsm = MemoryKeyStore::new();
+        let task = provisioning
+            .provision(memory_hsm.clone())
+            .then(|result| match result {
+                Ok(result) => {
+                    assert_eq!(result.hub_name, hub_name);
+                    assert_eq!(result.device_id, device_id);
+
+                    if let Some(credentials) = result.credentials() {
+                        assert_eq!(credentials.source(), &CredentialSource::Hsm);
+
+                        if let AuthType::X509(x509) = credentials.auth_type() {
+                            assert_eq!(x509.identity_cert(), identity_cert_val);
+                            assert_eq!(x509.identity_private_key(), identity_private_key_val);
+                        } else {
+                            panic!("Unexpected authentication type.")
+                        }
+                    } else {
+                        panic!("No credentials found. This is unexpected")
+                    }
+
+                    Ok::<_, Error>(())
+                }
+                Err(err) => panic!("Unexpected {:?}", err),
+            });
+        tokio::runtime::current_thread::Runtime::new()
+            .unwrap()
+            .block_on(task)
+            .unwrap();
+    }
+
+    #[test]
+    fn external_get_provisioning_info_x509_hsm_identity_not_specified_success() {
+        let credentials = Credentials::new("x509".to_string(), "hsm".to_string());
+
+        let hub_name = "TestHub";
+        let device_id= "TestDevice";
+
+        let provisioning_info = DeviceProvisioningInfo::new(
+            hub_name.to_string(),
+            device_id.to_string(),
+            credentials,
+        );
+
+        let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
+            error: None,
+            provisioning_info,
+        });
+        let memory_hsm = MemoryKeyStore::new();
+        let task = provisioning
+            .provision(memory_hsm.clone())
+            .then(|result| match result {
+                Ok(result) => {
+                    assert_eq!(result.hub_name.as_str(), hub_name);
+                    assert_eq!(result.device_id.as_str(), device_id);
+
+                    if let Some(credentials) = result.credentials() {
+                        assert_eq!(credentials.source(), &CredentialSource::Hsm);
+
+                        if let AuthType::X509(x509) = credentials.auth_type() {
+                            assert_eq!(x509.identity_cert(), "");
+                            assert_eq!(x509.identity_private_key(), "");
+                        } else {
+                            panic!("Unexpected authentication type.")
+                        }
+                    } else {
+                        panic!("No credentials found. This is unexpected")
+                    }
+
+                    Ok::<_, Error>(())
+                }
+                Err(err) => panic!("Unexpected {:?}", err),
+            });
         tokio::runtime::current_thread::Runtime::new()
             .unwrap()
             .block_on(task)
