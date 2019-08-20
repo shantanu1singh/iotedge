@@ -311,30 +311,14 @@ where
                                 let identity_private_key = credentials_info.identity_private_key().ok_or_else(|| {
                                     Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified))
                                 })?;
-
-//                                credentials_info.key().map_or_else(
-//                                    || {
-//                                        info!(
-//                                            "A key is expected in the response with the 'symmetric-key' authentication type and the 'source' set to 'payload'.");
-//                                        Err(Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::SymmetricKeyNotSpecified)))
-//                                    },
-//                                    |key| {
-//                                        let decoded_key = base64::decode(&key).map_err(|_| {
-//                                            Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::InvalidSymmetricKey))
-//                                        })?;
-//
-//                                        key_activator
-//                                            .activate_identity_key(KeyIdentity::Device, "primary".to_string(), &decoded_key)
-//                                            .map_err(|err| Error::from(err.context(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::KeyActivation))))?;
                                         Ok(Credentials {
                                             auth_type: AuthType::X509(
                                                 X509Credential {
                                                     identity_cert: identity_cert.to_string(),
                                                     identity_private_key: identity_private_key.to_string(),
                                                 }),
-                                            source: CredentialSource::Hsm,
+                                            source: CredentialSource::Payload,
                                         })
-//                                    })
                             },
                             "hsm" => Ok(Credentials {
                                 auth_type: AuthType::X509(
@@ -1285,6 +1269,35 @@ mod tests {
 
     #[test]
     fn external_get_provisioning_info_failure() {
+        let credentials = Credentials::new("symmetric-key".to_string(), "payload".to_string());
+        let provisioning_info = DeviceProvisioningInfo::new(
+            "TestHub".to_string(),
+            "TestDevice".to_string(),
+            credentials,
+        );
+
+        let provisioning = ExternalProvisioning::new(TestExternalProvisioningInterface {
+            error: Some(TestError {}),
+            provisioning_info,
+        });
+        let memory_hsm = MemoryKeyStore::new();
+        let task = provisioning.provision(memory_hsm.clone()).then(|result| {
+            assert_eq!(
+                result.unwrap_err().kind(),
+                &ErrorKind::ExternalProvisioning(
+                    ExternalProvisioningErrorReason::ProvisioningFailure
+                )
+            );
+            Ok::<_, Error>(())
+        });
+        tokio::runtime::current_thread::Runtime::new()
+            .unwrap()
+            .block_on(task)
+            .unwrap();
+    }
+
+    #[test]
+    fn test1() {
         let credentials = Credentials::new("symmetric-key".to_string(), "payload".to_string());
         let provisioning_info = DeviceProvisioningInfo::new(
             "TestHub".to_string(),
