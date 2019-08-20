@@ -311,14 +311,15 @@ where
                                 let identity_private_key = credentials_info.identity_private_key().ok_or_else(|| {
                                     Error::from(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::IdentityPrivateKeyNotSpecified))
                                 })?;
-                                        Ok(Credentials {
-                                            auth_type: AuthType::X509(
-                                                X509Credential {
-                                                    identity_cert: identity_cert.to_string(),
-                                                    identity_private_key: identity_private_key.to_string(),
-                                                }),
-                                            source: CredentialSource::Payload,
-                                        })
+
+                                Ok(Credentials {
+                                    auth_type: AuthType::X509(
+                                        X509Credential {
+                                            identity_cert: identity_cert.to_string(),
+                                            identity_private_key: identity_private_key.to_string(),
+                                        }),
+                                    source: CredentialSource::Payload,
+                                })
                             },
                             "hsm" => Ok(Credentials {
                                 auth_type: AuthType::X509(

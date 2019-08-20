@@ -75,7 +75,7 @@ use iothubservice::DeviceClient;
 use provisioning::provisioning::{
     AuthType, BackupProvisioning, CredentialSource, DpsSymmetricKeyProvisioning,
     DpsTpmProvisioning, DpsX509Provisioning, ExternalProvisioning, ManualProvisioning, Provision,
-    ProvisioningResult, ReprovisioningStatus,
+    ProvisioningResult, ReprovisioningStatus, X509Credential,
 };
 
 use crate::error::ExternalProvisioningErrorReason;
@@ -490,14 +490,6 @@ where
                         }
                     }
                     AuthType::X509(x509) => {
-                        //                        info!("Unexpected auth type. Only symmetric keys are expected");
-                        //                        return Err(Error::from(ErrorKind::Initialize(
-                        //                            InitializeErrorReason::ExternalProvisioningClient(
-                        //                                ExternalProvisioningErrorReason::InvalidAuthenticationType,
-                        //                            ),
-                        //                        )));
-
-                        info!("k2");
                         let (force_module_reprovision, hybrid_identity_key) =
                             get_or_create_hybrid_identity_key(
                                 &crypto,
@@ -511,135 +503,33 @@ where
                                 ),
                             ))?;
 
-                        info!("k1");
-
-                        match credentials.source() {
-                            CredentialSource::Payload => {
-                                let cert_bytes = base64::decode(x509.identity_cert())
-                                    .context(ErrorKind::Initialize(
-                                    InitializeErrorReason::ExternalProvisioningClient(
-                                        ExternalProvisioningErrorReason::InvalidIdentityCertificate,
-                                    ),
-                                ))?;
-                                let pk_bytes = base64::decode(x509.identity_private_key())
-                                    .context(ErrorKind::Initialize(
-                                    InitializeErrorReason::ExternalProvisioningClient(
-                                        ExternalProvisioningErrorReason::InvalidIdentityPrivateKey,
-                                    ),
-                                ))?;
-
-                                let native_cert = OpenSSLX509::from_pem(cert_bytes.as_ref())
-                                    .context(ErrorKind::Initialize(
-                                    InitializeErrorReason::ExternalProvisioningClient(
-                                        ExternalProvisioningErrorReason::InvalidIdentityCertificate,
-                                    ),
-                                ))?;
-
-                                let pem =
-                                    PemCertificate::new(cert_bytes, Some(pk_bytes), None, None);
-                                info!("k");
-                                let hyper_client =
-                                    MaybeProxyClient::new(get_proxy_uri(None)?, Some(pem), None)
-                                        .context(ErrorKind::Initialize(
-                                        InitializeErrorReason::ExternalProvisioningClient(
-                                            ExternalProvisioningErrorReason::ClientInitialization,
-                                        ),
-                                    ))?;
-
-                                info!("done");
-
-                                let common_name = native_cert.subject_name().entries_by_nid(OpenSSLNid::Nid::COMMONNAME).next().ok_or_else(|| {
-                                    ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(ExternalProvisioningErrorReason::ClientInitialization))
-                                })?;
-
-                                info!("done1");
-
-                                let digest = native_cert
-                                    .digest(OpenSSLHash::MessageDigest::sha256())
-                                    .context(ErrorKind::Initialize(
-                                        InitializeErrorReason::ExternalProvisioningClient(
-                                            ExternalProvisioningErrorReason::ClientInitialization,
-                                        ),
-                                    ))?;
-                                info!("done2");
-
-                                let thumbprint = hex::encode(digest);
-                                let cert_data = IdentityCertificateData {
-                                    common_name: String::from_utf8_lossy(
-                                        common_name.data().as_slice(),
-                                    )
-                                    .to_string(),
-                                    thumbprint: thumbprint.clone(),
-                                };
-
-                                let thumbprint_op = Some(cert_data.thumbprint.as_str());
-
-                                let (key_store, root_key) = external_provision_x509(
-                                    &provisioning_result,
-                                    &hybrid_identity_key,
-                                    thumbprint,
-                                )
-                                .context(ErrorKind::Initialize(
-                                    InitializeErrorReason::ExternalProvisioningClient(
-                                        ExternalProvisioningErrorReason::ClientInitialization,
-                                    ),
-                                ))?;
-
-                                info!("done3");
-
-                                start_edgelet!(
-                                    key_store,
-                                    provisioning_result,
-                                    root_key,
-                                    force_module_reprovision,
-                                    thumbprint_op,
-                                    hyper_client,
-                                );
-                            }
+                        let (hyper_client, device_cert_identity_data) = match credentials.source() {
+                            CredentialSource::Payload => prepare_external_provision_x509_payload(&x509),
                             CredentialSource::Hsm => {
-                                env::set_var(DPS_DEVICE_ID_CERT_ENV_KEY, x509.identity_cert());
-                                env::set_var(
-                                    DPS_DEVICE_ID_KEY_ENV_KEY,
-                                    x509.identity_private_key(),
-                                );
-
-                                let (hyper_client, device_cert_identity_data) =
-                                    prepare_httpclient_and_identity_data(
-                                        hsm_lock.clone(),
-                                        &settings,
-                                    )?;
-
-                                let id_data = device_cert_identity_data.ok_or_else(|| {
-                                    ErrorKind::Initialize(
-                                        InitializeErrorReason::ExternalProvisioningClient(
-                                            ExternalProvisioningErrorReason::HsmInitialization,
-                                        ),
-                                    )
-                                })?;
-
-                                let thumbprint_op = Some(id_data.thumbprint.as_str());
-
-                                let (key_store, root_key) = external_provision_x509(
-                                    &provisioning_result,
-                                    &hybrid_identity_key,
-                                    id_data.thumbprint.clone(),
-                                )
-                                .context(ErrorKind::Initialize(
-                                    InitializeErrorReason::ExternalProvisioningClient(
-                                        ExternalProvisioningErrorReason::ClientInitialization,
-                                    ),
-                                ))?;
-
-                                start_edgelet!(
-                                    key_store,
-                                    provisioning_result,
-                                    root_key,
-                                    force_module_reprovision,
-                                    thumbprint_op,
-                                    hyper_client,
-                                );
+                                prepare_external_provision_x509_hsm(&x509, hsm_lock.clone())
                             }
-                        }
+                        }?;
+
+                        let thumbprint_op = Some(device_cert_identity_data.thumbprint.as_str());
+                        let (key_store, root_key) = external_provision_x509(
+                            &provisioning_result,
+                            &hybrid_identity_key,
+                            device_cert_identity_data.thumbprint.to_string(),
+                        )
+                        .context(ErrorKind::Initialize(
+                            InitializeErrorReason::ExternalProvisioningClient(
+                                ExternalProvisioningErrorReason::ClientInitialization,
+                            ),
+                        ))?;
+
+                        start_edgelet!(
+                            key_store,
+                            provisioning_result,
+                            root_key,
+                            force_module_reprovision,
+                            thumbprint_op,
+                            hyper_client,
+                        );
                     }
                 };
             }
@@ -728,6 +618,79 @@ where
         info!("Shutdown complete.");
         Ok(())
     }
+}
+
+fn prepare_external_provision_x509_payload(
+    x509: &X509Credential,
+) -> Result<(MaybeProxyClient, IdentityCertificateData), Error> {
+    let cert_bytes = base64::decode(x509.identity_cert()).context(ErrorKind::Initialize(
+        InitializeErrorReason::ExternalProvisioningClient(
+            ExternalProvisioningErrorReason::InvalidIdentityCertificate,
+        ),
+    ))?;
+    let pk_bytes = base64::decode(x509.identity_private_key()).context(ErrorKind::Initialize(
+        InitializeErrorReason::ExternalProvisioningClient(
+            ExternalProvisioningErrorReason::InvalidIdentityPrivateKey,
+        ),
+    ))?;
+
+    let native_cert = OpenSSLX509::from_pem(cert_bytes.as_ref()).context(ErrorKind::Initialize(
+        InitializeErrorReason::ExternalProvisioningClient(
+            ExternalProvisioningErrorReason::InvalidIdentityCertificate,
+        ),
+    ))?;
+
+    let pem = PemCertificate::new(cert_bytes, Some(pk_bytes), None, None);
+    let hyper_client = MaybeProxyClient::new(get_proxy_uri(None)?, Some(pem), None).context(
+        ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
+            ExternalProvisioningErrorReason::ClientInitialization,
+        )),
+    )?;
+
+    let common_name = native_cert
+        .subject_name()
+        .entries_by_nid(OpenSSLNid::Nid::COMMONNAME)
+        .next()
+        .ok_or_else(|| {
+            ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
+                ExternalProvisioningErrorReason::ClientInitialization,
+            ))
+        })?;
+
+    let digest = native_cert
+        .digest(OpenSSLHash::MessageDigest::sha256())
+        .context(ErrorKind::Initialize(
+            InitializeErrorReason::ExternalProvisioningClient(
+                ExternalProvisioningErrorReason::ClientInitialization,
+            ),
+        ))?;
+
+    let thumbprint = hex::encode(digest);
+    let cert_data = IdentityCertificateData {
+        common_name: String::from_utf8_lossy(common_name.data().as_slice()).to_string(),
+        thumbprint: thumbprint.clone(),
+    };
+
+    Ok((hyper_client, cert_data))
+}
+
+fn prepare_external_provision_x509_hsm(
+    x509: &X509Credential,
+    hsm_lock: Arc<HsmLock>,
+) -> Result<(MaybeProxyClient, IdentityCertificateData), Error> {
+    env::set_var(DPS_DEVICE_ID_CERT_ENV_KEY, x509.identity_cert());
+    env::set_var(DPS_DEVICE_ID_KEY_ENV_KEY, x509.identity_private_key());
+
+    let (hyper_client, device_cert_identity_data) =
+        prepare_httpclient_and_identity_data_for_x509_provisioning(hsm_lock.clone())?;
+
+    let id_data = device_cert_identity_data.ok_or_else(|| {
+        ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
+            ExternalProvisioningErrorReason::HsmInitialization,
+        ))
+    })?;
+
+    Ok((hyper_client, id_data))
 }
 
 fn set_iot_edge_env_vars<S>(settings: &S) -> Result<(), Error>
