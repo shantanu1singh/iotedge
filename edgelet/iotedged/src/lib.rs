@@ -157,6 +157,15 @@ const EDGE_HYBRID_IDENTITY_MASTER_KEY_FILENAME: &str = "iotedge_hybrid_key";
 /// This is the name of the hybrid X509-SAS initialization vector
 const EDGE_HYBRID_IDENTITY_MASTER_KEY_IV_FILENAME: &str = "iotedge_hybrid_iv";
 
+/// This is the name of the hybrid id subdirectory that will
+/// contain the hybrid key and other related files
+const EDGE_EXTERNAL_PROVISIONING_SUBDIR: &str = "external_prov";
+
+/// This is the name of the identity X509 certificate file
+const EDGE_EXTERNAL_PROVISIONING_ID_CERT_FILENAME: &str = "id_cert";
+/// This is the name of the hybrid X509-SAS initialization vector
+const EDGE_EXTERNAL_PROVISIONING_ID_KEY_FILENAME: &str = "id_key";
+
 /// Size in bytes of the master identity key
 /// The length has been chosen to be compliant with the underlying
 /// default implementation of the HSM lib encryption algorithm. In the future
@@ -267,7 +276,57 @@ where
                 external.endpoint().as_str(),
             );
 
-            Some(get_external_provisioning_info(external, &mut tokio_runtime)?)
+            let prov_info = get_external_provisioning_info(external, &mut tokio_runtime)?;
+
+            if let Some(credentials) = prov_info.credentials() {
+                if let CredentialSource::Payload = credentials.source() {
+                    if let AuthType::X509(x509) = credentials.auth_type() {
+                        let subdir_path =
+                            Path::new(&settings.homedir()).join(EDGE_EXTERNAL_PROVISIONING_SUBDIR);
+
+                        // Ignore errors from this operation because we could be recovering from a previous bad
+                        // configuration and shouldn't stall the current configuration because of that
+                        let _u = fs::remove_dir_all(&subdir_path);
+                        DirBuilder::new()
+                            .recursive(true)
+                            .create(&subdir_path)
+                            .context(ErrorKind::Initialize(
+                                InitializeErrorReason::HybridAuthDirCreate,
+                            ))?;
+
+                        let cert_bytes = base64::decode(x509.identity_cert()).context(ErrorKind::Initialize(
+                            InitializeErrorReason::ExternalProvisioningClient(
+                                ExternalProvisioningErrorReason::InvalidIdentityCertificate,
+                            ),
+                        ))?;
+                        let pk_bytes = base64::decode(x509.identity_private_key()).context(ErrorKind::Initialize(
+                            InitializeErrorReason::ExternalProvisioningClient(
+                                ExternalProvisioningErrorReason::InvalidIdentityPrivateKey,
+                            ),
+                        ))?;
+
+                        let path = subdir_path.join(EDGE_EXTERNAL_PROVISIONING_ID_CERT_FILENAME);
+                        let mut file = File::create(path).context(ErrorKind::Initialize(
+                            InitializeErrorReason::HybridAuthKeyCreate,
+                        ))?;
+                        file.write_all(&cert_bytes)
+                            .context(ErrorKind::Initialize(
+                                InitializeErrorReason::HybridAuthKeyCreate,
+                            ))?;
+
+                        let path = subdir_path.join(EDGE_EXTERNAL_PROVISIONING_ID_KEY_FILENAME);
+                        let mut file = File::create(path).context(ErrorKind::Initialize(
+                            InitializeErrorReason::HybridAuthKeyCreate,
+                        ))?;
+                        file.write_all(&pk_bytes)
+                            .context(ErrorKind::Initialize(
+                                InitializeErrorReason::HybridAuthKeyCreate,
+                            ))?;
+                    }
+                }
+            }
+
+            Some(prov_info)
         }
         else{
             None
@@ -763,10 +822,21 @@ where
             ))?;
 
             if let Some(credentials) = prov_result.credentials() {
-                if let CredentialSource::Hsm = credentials.source() {
-                    if let AuthType::X509(x509) = credentials.auth_type() {
-                        env::set_var(DPS_DEVICE_ID_CERT_ENV_KEY, x509.identity_cert());
-                        env::set_var(DPS_DEVICE_ID_KEY_ENV_KEY, x509.identity_private_key());
+                if let AuthType::X509(x509) = credentials.auth_type() {
+                    match credentials.source() {
+                        CredentialSource::Hsm => {
+                            env::set_var(DPS_DEVICE_ID_CERT_ENV_KEY, x509.identity_cert());
+                            env::set_var(DPS_DEVICE_ID_KEY_ENV_KEY, x509.identity_private_key());
+                        },
+                        CredentialSource::Payload => {
+                            let external_prov_subdir_path =
+                                Path::new(&settings.homedir()).join(EDGE_EXTERNAL_PROVISIONING_SUBDIR);
+                            let cert_path = external_prov_subdir_path.join(EDGE_EXTERNAL_PROVISIONING_ID_CERT_FILENAME);
+                            let key_path = external_prov_subdir_path.join(EDGE_EXTERNAL_PROVISIONING_ID_KEY_FILENAME);
+
+                            env::set_var(DPS_DEVICE_ID_CERT_ENV_KEY, cert_path.as_os_str());
+                            env::set_var(DPS_DEVICE_ID_KEY_ENV_KEY, key_path.as_os_str());
+                        }
                     }
                 }
             }
