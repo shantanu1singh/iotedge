@@ -75,7 +75,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                 });
 
             bool optimizeForPerformance = this.configuration.GetValue("OptimizeForPerformance", true);
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) storeAndForward = this.GetStoreAndForwardConfiguration();
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) storeAndForward =
+                this.GetStoreAndForwardConfiguration();
 
             IConfiguration configuration = this.configuration.GetSection("experimentalFeatures");
             ExperimentalFeatures experimentalFeatures = ExperimentalFeatures.Create(configuration);
@@ -99,7 +100,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             builder.RegisterModule(new AmqpModule(amqpSettings["scheme"], amqpSettings.GetValue<ushort>("port"), this.serverCertificate, this.iotHubHostname, clientCertAuthEnabled));
         }
 
-        void RegisterMqttModule(ContainerBuilder builder, (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) storeAndForward, bool optimizeForPerformance)
+        void RegisterMqttModule(ContainerBuilder builder, (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) storeAndForward, bool optimizeForPerformance)
         {
             var topics = new MessageAddressConversionConfiguration(
                 this.configuration.GetSection(Constants.TopicNameConversionSectionName + ":InboundTemplates").Get<List<string>>(),
@@ -113,7 +114,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
 
         void RegisterRoutingModule(
             ContainerBuilder builder,
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) storeAndForward,
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) storeAndForward,
             ExperimentalFeatures experimentalFeatures)
         {
             var routes = this.configuration.GetSection("routes").Get<Dictionary<string, string>>();
@@ -142,7 +143,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             bool encryptTwinStore = this.configuration.GetValue("EncryptTwinStore", false);
             int configUpdateFrequencySecs = this.configuration.GetValue("ConfigRefreshFrequencySecs", 3600);
             TimeSpan configUpdateFrequency = TimeSpan.FromSeconds(configUpdateFrequencySecs);
-            bool usePersistentStorage = this.configuration.GetValue("UsePersistentStorage", true);
 
             builder.RegisterModule(
                 new RoutingModule(
@@ -169,14 +169,13 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                     upstreamFanOutFactor,
                     encryptTwinStore,
                     configUpdateFrequency,
-                    experimentalFeatures,
-                    usePersistentStorage));
+                    experimentalFeatures));
         }
 
         void RegisterCommonModule(
             ContainerBuilder builder,
             bool optimizeForPerformance,
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) storeAndForward,
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) storeAndForward,
             ExperimentalFeatures experimentalFeatures)
         {
             bool cacheTokens = this.configuration.GetValue("CacheTokens", false);
@@ -201,7 +200,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             TimeSpan diskSpaceCheckFrequency = TimeSpan.FromSeconds(diskSpaceCheckFrequencySecs);
             long rocksDbCompactionPeriodSecs = this.configuration.GetValue("RocksDbCompactionPeriodSecs", 7200);
             TimeSpan rocksDbCompactionPeriod = TimeSpan.FromSeconds(rocksDbCompactionPeriodSecs);
-            bool useBackupAndRestore = this.configuration.GetValue("UseBackupAndRestore", false);
 
             // Register modules
             builder.RegisterModule(
@@ -228,7 +226,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                     diskSpaceCheckFrequency,
                     experimentalFeatures,
                     rocksDbCompactionPeriod,
-                    useBackupAndRestore));
+                    storeAndForward.storageBackupPath));
         }
 
         static string GetProductInfo()
@@ -238,12 +236,13 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             return productInfo;
         }
 
-        (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) GetStoreAndForwardConfiguration()
+        (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) GetStoreAndForwardConfiguration()
         {
             int defaultTtl = -1;
             bool usePersistentStorage = this.configuration.GetValue<bool>("usePersistentStorage");
             int timeToLiveSecs = defaultTtl;
             string storagePath = this.GetStoragePath();
+            string storageBackupPath = this.GetStorageBackupPath(storagePath);
             bool storeAndForwardEnabled = this.configuration.GetValue<bool>("storeAndForwardEnabled");
             if (storeAndForwardEnabled)
             {
@@ -252,7 +251,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             }
 
             var storeAndForwardConfiguration = new StoreAndForwardConfiguration(timeToLiveSecs);
-            return (storeAndForwardEnabled, usePersistentStorage, storeAndForwardConfiguration, storagePath);
+            return (storeAndForwardEnabled, usePersistentStorage, storeAndForwardConfiguration, storagePath, storageBackupPath);
         }
 
         string GetStoragePath()
@@ -266,6 +265,19 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             string storagePath = Path.Combine(baseStoragePath, Constants.EdgeHubStorageFolder);
             Directory.CreateDirectory(storagePath);
             return storagePath;
+        }
+
+        string GetStorageBackupPath(string storageFolderPath)
+        {
+            string baseBackupStoragePath = this.configuration.GetValue<string>("backupFolder");
+            if (string.IsNullOrWhiteSpace(baseBackupStoragePath) || !Directory.Exists(baseBackupStoragePath))
+            {
+                baseBackupStoragePath = storageFolderPath;
+            }
+
+            string backupStoragePath = Path.Combine(baseBackupStoragePath, Constants.EdgeHubStorageBackupFolder);
+            Directory.CreateDirectory(backupStoragePath);
+            return backupStoragePath;
         }
 
         Option<T> GetConfigurationValueIfExists<T>(string key)

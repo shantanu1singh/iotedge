@@ -86,7 +86,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
             var mqttSettingsConfiguration = new Mock<IConfiguration>();
             mqttSettingsConfiguration.Setup(c => c.GetSection(It.IsAny<string>())).Returns(Mock.Of<IConfigurationSection>(s => s.Value == null));
 
-            var experimentalFeatures = new ExperimentalFeatures(true, false, false, true);
+            var experimentalFeatures = new ExperimentalFeatures(true, false, false, true, true);
 
             builder.RegisterBuildCallback(
                 c =>
@@ -127,7 +127,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
                     TimeSpan.FromSeconds(120),
                     experimentalFeatures,
                     TimeSpan.FromHours(2),
-                    false));
+                    string.Empty));
 
             builder.RegisterModule(
                 new RoutingModule(
@@ -154,8 +154,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
                     10,
                     false,
                     TimeSpan.FromHours(1),
-                    experimentalFeatures,
-                    false));
+                    experimentalFeatures));
 
             builder.RegisterModule(new HttpModule());
             builder.RegisterModule(new MqttModule(mqttSettingsConfiguration.Object, topics, this.serverCertificate, false, false, false));

@@ -56,15 +56,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
             }
         }
 
-        public void SetMaxMemoryUsageSize(IDbStoreProvider dbStoreStatistics, bool usePersistentStorage, long maxUsageInBytes)
-        {
-            lock (this.updateLock)
-            {
-                Events.SetMaxMemorySpaceUsage(maxUsageInBytes, this.storageFolder);
-                this.inner = new FixedSizeMemorySpaceChecker(dbStoreStatistics, this.storageFolder, usePersistentStorage, maxUsageInBytes, this.checkFrequency, Events.Log);
-            }
-        }
-
         internal static Option<DriveInfo> GetMatchingDrive(string storageFolder)
         {
             DriveInfo match = null;

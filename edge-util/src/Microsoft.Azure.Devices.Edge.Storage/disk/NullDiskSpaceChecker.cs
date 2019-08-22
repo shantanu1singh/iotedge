@@ -11,10 +11,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.Disk
         {
         }
 
-        public void SetMaxMemoryUsageSize(IDbStoreProvider dbStoreStatistics, bool usePersistentStorage, long maxUsageInBytes)
-        {
-        }
-
         public bool IsFull => false;
     }
 }

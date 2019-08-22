@@ -17,40 +17,36 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
     /// </summary>
     sealed class RocksDbWrapper : IRocksDb
     {
-        static readonly string Temp = Path.GetTempPath();
-        static readonly string DbBackupPath = Path.Combine(Temp, "edgehub_rocksdb_backup");
         static readonly ILogger Log = Logger.Factory.CreateLogger<RocksDbWrapper>();
 
         readonly AtomicBoolean isDisposed = new AtomicBoolean(false);
         readonly RocksDb db;
         readonly string path;
         readonly DbOptions dbOptions;
-        readonly Cache cache;
+        readonly Option<string> backupPath;
         readonly bool useBackupAndRestore;
 
-        RocksDbWrapper(DbOptions dbOptions, RocksDb db, string path, Cache cache, bool useBackupAndRestore)
+        RocksDbWrapper(DbOptions dbOptions, RocksDb db, string path, Option<string> backupPath, bool useBackupAndRestore)
         {
             this.db = db;
             this.path = path;
             this.dbOptions = dbOptions;
-            this.cache = cache;
             this.useBackupAndRestore = useBackupAndRestore;
+            this.backupPath = backupPath;
         }
 
-        public static RocksDbWrapper Create(IRocksDbOptionsProvider optionsProvider, string path, IEnumerable<string> partitionsList, bool useBackupAndRestore)
+        public static RocksDbWrapper Create(IRocksDbOptionsProvider optionsProvider, string path, IEnumerable<string> partitionsList, Option<string> storageBackupPath, bool useBackupAndRestore)
         {
             Preconditions.CheckNonWhiteSpace(path, nameof(path));
             Preconditions.CheckNotNull(optionsProvider, nameof(optionsProvider));
             DbOptions dbOptions = Preconditions.CheckNotNull(optionsProvider.GetDbOptions());
 
-            // This is similar to the default cache created by RocksDb if no explicit cache instance is provided as part of
-            // initialization.
-            Cache lruCache = Cache.CreateLru(8 * 1024 * 1024);
-            dbOptions.SetBlockBasedTableFactory(new BlockBasedTableOptions().SetBlockCache(lruCache));
-
             if (useBackupAndRestore)
             {
-                RestoreDb(dbOptions, path);
+                string backupPath = storageBackupPath.Expect(() => new ArgumentException($"The value of {nameof(storageBackupPath)} needs to be specified if backup and restore is enabled."));
+                Preconditions.CheckNonWhiteSpace(backupPath, nameof(storageBackupPath));
+
+                RestoreDb(dbOptions, path, backupPath);
             }
 
             IEnumerable<string> existingColumnFamilies = ListColumnFamilies(dbOptions, path);
@@ -62,7 +58,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             }
 
             RocksDb db = RocksDb.Open(dbOptions, path, columnFamilies);
-            var rocksDbWrapper = new RocksDbWrapper(dbOptions, db, path, lruCache, useBackupAndRestore);
+            var rocksDbWrapper = new RocksDbWrapper(dbOptions, db, path, storageBackupPath, useBackupAndRestore);
             return rocksDbWrapper;
         }
 
@@ -88,58 +84,28 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public void Dispose()
         {
-            Log.LogInformation($"Dispose called {DbBackupPath}");
+            string backupPath1 = this.backupPath.OrDefault();
+            Log.LogInformation($"Dispose called {backupPath1}");
             Log.LogInformation("Directory size:" + GetDirectorySize(this.path));
-            Log.LogInformation("backup Directory size:" + GetDirectorySize(DbBackupPath));
+            Log.LogInformation("backup Directory size:" + GetDirectorySize(backupPath1));
 
             if (!this.isDisposed.GetAndSet(true))
             {
-                this.GetApproximateMemoryUsage();
                 this.BackupDb();
                 this.db?.Dispose();
             }
         }
 
-        public ulong GetApproximateMemoryUsage()
+        static void RestoreDb(DbOptions dbOptions, string path, string backupPath)
         {
-            ulong memoryUsedInBytes = 0;
-            Log.LogInformation("GetMemoryStats called");
-            IntPtr mcc = Native.Instance.rocksdb_memory_consumers_create();
-
-            Native.Instance.rocksdb_memory_consumers_add_db(mcc, this.db.Handle);
-            Native.Instance.rocksdb_memory_consumers_add_cache(mcc, this.cache.Handle);
-
-            IntPtr muc = Native.Instance.rocksdb_approximate_memory_usage_create(mcc, out IntPtr err);
-            Debug.Assert(err == IntPtr.Zero);
-
-            ulong memTableUsage = Native.Instance.rocksdb_approximate_memory_usage_get_mem_table_total(muc);
-            memoryUsedInBytes += memTableUsage;
-            Log.LogInformation("mtt: " + memTableUsage);
-
-            ulong memTableReadersUsage = Native.Instance.rocksdb_approximate_memory_usage_get_mem_table_readers_total(muc);
-            memoryUsedInBytes += memTableReadersUsage;
-            Log.LogInformation("mtrt: " + memTableReadersUsage);
-
-            ulong cacheUsage = Native.Instance.rocksdb_approximate_memory_usage_get_cache_total(muc);
-            memoryUsedInBytes += cacheUsage;
-            Log.LogInformation("cachet: " + cacheUsage);
-
-            Native.Instance.rocksdb_memory_consumers_destroy(mcc);
-            Native.Instance.rocksdb_approximate_memory_usage_destroy(muc);
-
-            return memoryUsedInBytes;
-        }
-
-        static void RestoreDb(DbOptions dbOptions, string path)
-        {
-            Log.LogInformation($"Restore called {DbBackupPath}");
+            Log.LogInformation($"Restore called {backupPath}");
 
             // Backup DB from last backup if available.
-            if (Directory.Exists(DbBackupPath))
+            if (Directory.Exists(backupPath))
             {
-                Log.LogInformation("backup Directory sizeon restore:" + GetDirectorySize(DbBackupPath));
+                Log.LogInformation("backup Directory sizeon restore:" + GetDirectorySize(backupPath));
                 Events.RestoringFromBackup();
-                IntPtr backupEngine = Native.Instance.rocksdb_backup_engine_open(dbOptions.Handle, DbBackupPath, out IntPtr err);
+                IntPtr backupEngine = Native.Instance.rocksdb_backup_engine_open(dbOptions.Handle, backupPath, out IntPtr err);
                 Debug.Assert(err == IntPtr.Zero);
 
                 IntPtr restore_options = Native.Instance.rocksdb_restore_options_create();
@@ -153,7 +119,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             }
             else
             {
-                Events.BackupDirectoryNotFound(DbBackupPath);
+                Events.BackupDirectoryNotFound(backupPath);
             }
         }
 
@@ -162,7 +128,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             if (this.useBackupAndRestore)
             {
                 Events.StartingBackup();
-                IntPtr backupEngine = Native.Instance.rocksdb_backup_engine_open(this.dbOptions.Handle, DbBackupPath, out IntPtr err);
+                string backupPathValue = this.backupPath.Expect(() => new InvalidOperationException($"The value of {nameof(this.backupPath)} is expected to be a valid path if backup and restore is enabled."));
+
+                IntPtr backupEngine = Native.Instance.rocksdb_backup_engine_open(this.dbOptions.Handle, backupPathValue, out IntPtr err);
                 Debug.Assert(err == IntPtr.Zero);
 
                 // Create a new DB backup.
@@ -174,7 +142,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 Log.LogInformation("Purged old backups: " + err.ToInt64());
                 Debug.Assert(err == IntPtr.Zero);
 
-                Log.LogInformation("backup Directory size:" + GetDirectorySize(DbBackupPath));
+                Log.LogInformation("backup Directory size:" + GetDirectorySize(backupPathValue));
                 Native.Instance.rocksdb_backup_engine_close(backupEngine);
                 Events.BackupComplete();
             }

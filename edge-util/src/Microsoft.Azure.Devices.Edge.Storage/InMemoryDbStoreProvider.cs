@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 namespace Microsoft.Azure.Devices.Edge.Storage
 {
-    using System;
     using System.Collections.Concurrent;
     using Microsoft.Azure.Devices.Edge.Util;
 
@@ -29,7 +28,5 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         {
             // No-op
         }
-
-        public ulong GetApproximateMemoryUsage() => throw new NotImplementedException();
     }
 }

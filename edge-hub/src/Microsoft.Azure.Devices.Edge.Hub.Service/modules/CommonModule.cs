@@ -48,7 +48,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
         readonly ExperimentalFeatures experimentalFeatures;
         readonly int storageLimitThresholdPercentage;
         readonly TimeSpan rocksDbCompactionPeriod;
-        readonly bool useBackupAndRestore;
+        readonly string storageBackupPath;
 
         public CommonModule(
             string productInfo,
@@ -73,7 +73,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
             TimeSpan diskSpaceCheckFrequency,
             ExperimentalFeatures experimentalFeatures,
             TimeSpan rocksDbCompactionPeriod,
-            bool useBackupAndRestore)
+            string storageBackupPath)
         {
             this.productInfo = productInfo;
             this.iothubHostName = Preconditions.CheckNonWhiteSpace(iothubHostName, nameof(iothubHostName));
@@ -97,7 +97,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
             this.diskSpaceCheckFrequency = diskSpaceCheckFrequency;
             this.experimentalFeatures = experimentalFeatures;
             this.rocksDbCompactionPeriod = rocksDbCompactionPeriod;
-            this.useBackupAndRestore = useBackupAndRestore;
+            this.storageBackupPath = storageBackupPath;
         }
 
         protected override void Load(ContainerBuilder builder)
@@ -172,7 +172,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                         var loggerFactory = c.Resolve<ILoggerFactory>();
                         ILogger logger = loggerFactory.CreateLogger(typeof(RoutingModule));
 
-                        if (this.usePersistentStorage || this.useBackupAndRestore)
+                        if (this.usePersistentStorage)
                         {
                             // Create partitions for messages and twins
                             var partitionsList = new List<string> { Core.Constants.MessageStorePartitionKey, Core.Constants.TwinStorePartitionKey, Core.Constants.CheckpointStorePartitionKey };
@@ -185,7 +185,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                                     partitionsList,
                                     Option.Some(diskSpaceChecker),
                                     this.rocksDbCompactionPeriod,
-                                    this.useBackupAndRestore);
+                                    Option.Some(this.storageBackupPath),
+                                    this.experimentalFeatures.EnableStorageBackupAndRestore);
                                 logger.LogInformation($"Created persistent store at {this.storagePath}");
                                 return dbStoreProvider;
                             }
