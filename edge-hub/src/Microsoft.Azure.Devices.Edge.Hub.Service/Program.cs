@@ -102,9 +102,19 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             {
                 await protocolHead.StartAsync();
                 await Task.WhenAny(cts.Token.WhenCanceled(), renewal.Token.WhenCanceled());
-                logger.LogInformation("Stopping the protocol heads...");
-                await Task.WhenAny(protocolHead.CloseAsync(CancellationToken.None), Task.Delay(TimeSpan.FromSeconds(10), CancellationToken.None));
-                logger.LogInformation("Protocol heads stopped.");
+
+                Task backupDatabaseTask = BackupDatabaseStore(container);
+                Task protocolHeadCloseTask = Task.Run(async () =>
+                {
+                    logger.LogInformation("Stopping the protocol heads...");
+                    await protocolHead.CloseAsync(CancellationToken.None);
+                    logger.LogInformation("Protocol heads stopped.");
+                });
+
+                //logger.LogInformation("Stopping the protocol heads...");
+                await Task.WhenAny(Task.WhenAll(backupDatabaseTask, protocolHeadCloseTask), Task.Delay(TimeSpan.FromSeconds(10), CancellationToken.None));
+
+                //logger.LogInformation("Protocol heads stopped.");
             }
 
             completed.Set();
@@ -141,6 +151,12 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             }
 
             return new EdgeHubProtocolHead(protocolHeads, logger);
+        }
+
+        static Task BackupDatabaseStore(IContainer container)
+        {
+            IDbStoreProvider dbStoreProvider = container.Resolve<IDbStoreProvider>();
+            return Task.Run(() => dbStoreProvider.BackupDbStore());
         }
 
         static void LogLogo(ILogger logger)

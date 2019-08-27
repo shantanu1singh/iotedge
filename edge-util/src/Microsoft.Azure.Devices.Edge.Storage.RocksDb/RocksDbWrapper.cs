@@ -84,14 +84,8 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public void Dispose()
         {
-            string backupPath1 = this.backupPath.OrDefault();
-            Log.LogInformation($"Dispose called {backupPath1}");
-            Log.LogInformation("Directory size:" + GetDirectorySize(this.path));
-            Log.LogInformation("backup Directory size:" + GetDirectorySize(backupPath1));
-
             if (!this.isDisposed.GetAndSet(true))
             {
-                this.BackupDb();
                 this.db?.Dispose();
             }
         }
@@ -111,7 +105,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 IntPtr restore_options = Native.Instance.rocksdb_restore_options_create();
                 Native.Instance.rocksdb_backup_engine_restore_db_from_latest_backup(
                     backupEngine, path, path, restore_options, out err);
-                Debug.Assert(err == IntPtr.Zero);
+                //Debug.Assert(err == IntPtr.Zero);
 
                 Native.Instance.rocksdb_restore_options_destroy(restore_options);
                 Native.Instance.rocksdb_backup_engine_close(backupEngine);
@@ -123,8 +117,13 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             }
         }
 
-        void BackupDb()
+        public void Backup()
         {
+            string backupPath1 = this.backupPath.OrDefault();
+            Log.LogInformation($"Dispose called {backupPath1}");
+            Log.LogInformation("Directory size:" + GetDirectorySize(this.path));
+            Log.LogInformation("backup Directory size:" + GetDirectorySize(backupPath1));
+
             if (this.useBackupAndRestore)
             {
                 Events.StartingBackup();
