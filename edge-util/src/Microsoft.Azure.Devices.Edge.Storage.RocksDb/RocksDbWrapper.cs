@@ -161,14 +161,14 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
                 IntPtr backupInfo = Native.Instance.rocksdb_backup_engine_get_backup_info(backupEngine);
                 int numberOfBackups = Native.Instance.rocksdb_backup_engine_info_count(backupInfo);
-                uint lastBackupId = Native.Instance.rocksdb_backup_engine_info_backup_id(backupInfo, numberOfBackups);
+                uint lastBackupId = Native.Instance.rocksdb_backup_engine_info_backup_id(backupInfo, numberOfBackups-1);
 
                 Events.BackupInformation(
-                    numberOfBackups,
-                    Native.Instance.rocksdb_backup_engine_info_timestamp(backupInfo, numberOfBackups),
+                    numberOfBackups - 1,
+                    Native.Instance.rocksdb_backup_engine_info_timestamp(backupInfo, numberOfBackups - 1),
                     lastBackupId,
-                    Native.Instance.rocksdb_backup_engine_info_size(backupInfo, numberOfBackups),
-                    Native.Instance.rocksdb_backup_engine_info_number_files(backupInfo, numberOfBackups));
+                    Native.Instance.rocksdb_backup_engine_info_size(backupInfo, numberOfBackups - 1),
+                    Native.Instance.rocksdb_backup_engine_info_number_files(backupInfo, numberOfBackups - 1));
 
                 Native.Instance.rocksdb_backup_engine_verify_backup(backupEngine, lastBackupId, out err);
                 if (err != IntPtr.Zero)
