@@ -102,14 +102,36 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 IntPtr backupEngine = Native.Instance.rocksdb_backup_engine_open(dbOptions.Handle, backupPath, out IntPtr err);
                 Debug.Assert(err == IntPtr.Zero);
 
-                IntPtr restore_options = Native.Instance.rocksdb_restore_options_create();
-                Native.Instance.rocksdb_backup_engine_restore_db_from_latest_backup(
-                    backupEngine, path, path, restore_options, out err);
-                //Debug.Assert(err == IntPtr.Zero);
+                IntPtr backupInfo = Native.Instance.rocksdb_backup_engine_get_backup_info(backupEngine);
+                int numberOfBackups = Native.Instance.rocksdb_backup_engine_info_count(backupInfo);
 
-                Native.Instance.rocksdb_restore_options_destroy(restore_options);
+                if (numberOfBackups > 0)
+                {
+                    for (int i = 0; i < numberOfBackups; i++)
+                    {
+                        Events.BackupInformation(
+                            i,
+                            Native.Instance.rocksdb_backup_engine_info_timestamp(backupInfo, i),
+                            Native.Instance.rocksdb_backup_engine_info_backup_id(backupInfo, i),
+                            Native.Instance.rocksdb_backup_engine_info_size(backupInfo, i),
+                            Native.Instance.rocksdb_backup_engine_info_number_files(backupInfo, i));
+                    }
+
+                    IntPtr restore_options = Native.Instance.rocksdb_restore_options_create();
+                    Native.Instance.rocksdb_backup_engine_restore_db_from_latest_backup(
+                        backupEngine, path, path, restore_options, out err);
+                    //Debug.Assert(err == IntPtr.Zero);
+
+                    Native.Instance.rocksdb_restore_options_destroy(restore_options);
+                    Events.RestoreComplete();
+                }
+                else
+                {
+                    Events.NoBackupsForRestore();
+                }
+
+                Native.Instance.rocksdb_backup_engine_info_destroy(backupInfo);
                 Native.Instance.rocksdb_backup_engine_close(backupEngine);
-                Events.RestoreComplete();
             }
             else
             {
@@ -120,7 +142,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
         public void Backup()
         {
             string backupPath1 = this.backupPath.OrDefault();
-            Log.LogInformation($"Dispose called {backupPath1}");
+            Log.LogInformation($"Backup called {backupPath1}");
             Log.LogInformation("Directory size:" + GetDirectorySize(this.path));
             Log.LogInformation("backup Directory size:" + GetDirectorySize(backupPath1));
 
@@ -133,13 +155,33 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 Debug.Assert(err == IntPtr.Zero);
 
                 // Create a new DB backup.
-                Native.Instance.rocksdb_backup_engine_create_new_backup(backupEngine, this.db.Handle, out err);
+                //Native.Instance.rocksdb_backup_engine_create_new_backup(backupEngine, this.db.Handle, out err);
+                Native.Instance.rocksdb_backup_engine_create_new_backup_flush(backupEngine, this.db.Handle, true, out err);
                 Debug.Assert(err == IntPtr.Zero);
 
-                // Purge old backups but the last one.
-                Native.Instance.rocksdb_backup_engine_purge_old_backups(backupEngine, 1, out err);
-                Log.LogInformation("Purged old backups: " + err.ToInt64());
-                Debug.Assert(err == IntPtr.Zero);
+                IntPtr backupInfo = Native.Instance.rocksdb_backup_engine_get_backup_info(backupEngine);
+                int numberOfBackups = Native.Instance.rocksdb_backup_engine_info_count(backupInfo);
+                uint lastBackupId = Native.Instance.rocksdb_backup_engine_info_backup_id(backupInfo, numberOfBackups);
+
+                Events.BackupInformation(
+                    numberOfBackups,
+                    Native.Instance.rocksdb_backup_engine_info_timestamp(backupInfo, numberOfBackups),
+                    lastBackupId,
+                    Native.Instance.rocksdb_backup_engine_info_size(backupInfo, numberOfBackups),
+                    Native.Instance.rocksdb_backup_engine_info_number_files(backupInfo, numberOfBackups));
+
+                Native.Instance.rocksdb_backup_engine_verify_backup(backupEngine, lastBackupId, out err);
+                if (err != IntPtr.Zero)
+                {
+                    Events.BackupVerificationFailed();
+                }
+                else
+                {
+                    // Purge old backups but the last one.
+                    Native.Instance.rocksdb_backup_engine_purge_old_backups(backupEngine, 1, out err);
+                    Log.LogInformation("Purged old backups: " + err.ToInt64());
+                    Debug.Assert(err == IntPtr.Zero);
+                }
 
                 Log.LogInformation("backup Directory size:" + GetDirectorySize(backupPathValue));
                 Native.Instance.rocksdb_backup_engine_close(backupEngine);
@@ -198,7 +240,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             {
                 StartingBackup = IdStart,
                 BackupComplete,
+                BackupInfo,
+                BackupVerificationFailure,
                 RestoringFromBackup,
+                NoBackupsForRestore,
                 RestoreComplete,
                 BackupDirectoryNotFound
             }
@@ -213,9 +258,24 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 Log.LogInformation((int)EventIds.BackupComplete, $"Backup of database complete.");
             }
 
+            internal static void BackupVerificationFailed()
+            {
+                Log.LogError((int)EventIds.BackupVerificationFailure, $"Verification of created backup failed.");
+            }
+
             internal static void RestoringFromBackup()
             {
                 Log.LogInformation((int)EventIds.RestoringFromBackup, "Starting restore of database from last backup.");
+            }
+
+            internal static void BackupInformation(int backupIndex, long backupTimestamp, uint backupId, ulong backupSize, uint numberOfFilesInBackup)
+            {
+                Log.LogDebug((int)EventIds.BackupComplete, $"Backup Info: Index={backupIndex}, Timestamp={backupTimestamp}, ID={backupId}, Size={backupSize}, NumberOfFiles={numberOfFilesInBackup}.");
+            }
+
+            internal static void NoBackupsForRestore()
+            {
+                Log.LogInformation((int)EventIds.NoBackupsForRestore, "No backups were found to restore database with.");
             }
 
             internal static void RestoreComplete()
