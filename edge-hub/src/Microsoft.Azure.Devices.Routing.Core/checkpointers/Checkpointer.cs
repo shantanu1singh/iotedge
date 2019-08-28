@@ -142,7 +142,8 @@ namespace Microsoft.Azure.Devices.Routing.Core.Checkpointers
         static class Events
         {
             const int IdStart = Routing.EventIds.Checkpointer;
-            static readonly ILogger Log = Routing.LoggerFactory.CreateLogger<Checkpointer>();
+            //static readonly ILogger Log = Routing.LoggerFactory.CreateLogger<Checkpointer>();
+            static readonly ILogger Log = Logger.Factory.CreateLogger<Checkpointer>();
 
             enum EventIds
             {
