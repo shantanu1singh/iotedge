@@ -84,8 +84,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public void Dispose()
         {
+            Log.LogInformation($"RocksDbWrapper Dispose called");
             if (!this.isDisposed.GetAndSet(true))
             {
+                this.Backup();
                 this.db?.Dispose();
             }
         }
