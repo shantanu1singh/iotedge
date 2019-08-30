@@ -23,11 +23,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Config
         Option<EdgeHubConfig> currentConfig;
         Option<IConfigSource> configProvider;
 
-        public ConfigUpdater(
-            Router router,
-            IMessageStore messageStore,
-            TimeSpan configUpdateFrequency,
-            IDiskSpaceChecker diskSpaceChecker)
+        public ConfigUpdater(Router router, IMessageStore messageStore, TimeSpan configUpdateFrequency, IDiskSpaceChecker diskSpaceChecker)
         {
             this.router = Preconditions.CheckNotNull(router, nameof(router));
             this.messageStore = messageStore;
@@ -132,7 +128,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Config
             {
                 this.messageStore?.SetTimeToLive(storeAndForwardConfiguration.TimeToLive);
                 storeAndForwardConfiguration.MaxStorageSpaceBytes.ForEach(s => this.diskSpaceChecker?.SetMaxDiskUsageSize(s));
-
                 Events.UpdatedStoreAndForwardConfiguration();
             }
         }
