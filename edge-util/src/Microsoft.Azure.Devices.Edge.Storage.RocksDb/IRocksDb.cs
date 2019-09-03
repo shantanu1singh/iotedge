@@ -28,5 +28,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
         void Compact(ColumnFamilyHandle handle);
 
         void Backup();
+
+        void Close();
     }
 }

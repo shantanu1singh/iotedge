@@ -199,6 +199,11 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             }
         }
 
+        public void Close()
+        {
+            this.Backup();
+        }
+
         static long GetDirectorySize(string directoryPath)
         {
             if (!Directory.Exists(directoryPath))

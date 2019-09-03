@@ -96,9 +96,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             }
         }
 
-        public void BackupDbStore()
+        public void Close()
         {
-            this.db.Backup();
+            this.db.Close();
         }
 
         public void Dispose()

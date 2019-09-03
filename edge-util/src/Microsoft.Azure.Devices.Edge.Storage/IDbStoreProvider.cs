@@ -14,6 +14,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         void RemoveDbStore(string partitionName);
 
-        void BackupDbStore();
+        void Close();
     }
 }

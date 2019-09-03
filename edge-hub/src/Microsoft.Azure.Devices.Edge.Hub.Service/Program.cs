@@ -26,7 +26,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
 
     public class Program
     {
-        static readonly TimeSpan ShutdownWaitPeriod = TimeSpan.FromSeconds(20);
+        static readonly TimeSpan ShutdownWaitPeriod = TimeSpan.FromSeconds(60);
 
         public static int Main()
         {
@@ -103,19 +103,11 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                 await protocolHead.StartAsync();
                 await Task.WhenAny(cts.Token.WhenCanceled(), renewal.Token.WhenCanceled());
 
-                //Task backupDatabaseTask = BackupDatabaseStore(container);
-                Task backupDatabaseTask = Task.CompletedTask;
-                Task protocolHeadCloseTask = Task.Run(async () =>
-                {
-                    logger.LogInformation("Stopping the protocol heads...");
-                    await protocolHead.CloseAsync(CancellationToken.None);
-                    logger.LogInformation("Protocol heads stopped.");
-                });
+                logger.LogInformation("Stopping the protocol heads...");
+                await protocolHead.CloseAsync(CancellationToken.None);
+                logger.LogInformation("Protocol heads stopped.");
 
-                //logger.LogInformation("Stopping the protocol heads...");
-                await Task.WhenAny(Task.WhenAll(backupDatabaseTask, protocolHeadCloseTask), Task.Delay(TimeSpan.FromSeconds(300), CancellationToken.None));
-
-                //logger.LogInformation("Protocol heads stopped.");
+                CloseDbStoreProvider(container);
             }
 
             completed.Set();
@@ -154,10 +146,10 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             return new EdgeHubProtocolHead(protocolHeads, logger);
         }
 
-        static Task BackupDatabaseStore(IContainer container)
+        static void CloseDbStoreProvider(IContainer container)
         {
             IDbStoreProvider dbStoreProvider = container.Resolve<IDbStoreProvider>();
-            return Task.Run(() => dbStoreProvider.BackupDbStore());
+            dbStoreProvider.Close();
         }
 
         static void LogLogo(ILogger logger)
