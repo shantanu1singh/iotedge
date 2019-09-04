@@ -16,8 +16,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
     using Microsoft.Azure.Devices.Edge.Hub.Http;
     using Microsoft.Azure.Devices.Edge.Hub.Mqtt;
     using Microsoft.Azure.Devices.Edge.Storage;
-    using Microsoft.Azure.Devices.Edge.Storage.RocksDb;
-    using Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Azure.Devices.Edge.Util.Metrics;
     using Microsoft.Azure.Devices.Routing.Core;

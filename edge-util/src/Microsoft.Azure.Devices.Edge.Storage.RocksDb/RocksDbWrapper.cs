@@ -17,8 +17,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
     /// </summary>
     sealed class RocksDbWrapper : IRocksDb
     {
-        static readonly ILogger Log = Logger.Factory.CreateLogger<RocksDbWrapper>();
-
         readonly AtomicBoolean isDisposed = new AtomicBoolean(false);
         readonly RocksDb db;
         readonly string path;
@@ -50,6 +48,11 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 Preconditions.CheckNonWhiteSpace(backupPath, nameof(storageBackupPath));
 
                 RestoreDb(dbOptions, path, backupPath);
+
+                // Retrieve existing column families from the restored DB or else the call to open the database later fails if
+                // not all the column families present in the existing database (the backup) are not specified while
+                // calling the RocksDb.Open() method.
+                existingColumnFamilies = ListColumnFamilies(dbOptions, path);
             }
 
             IEnumerable<string> columnFamiliesList = existingColumnFamilies.Union(Preconditions.CheckNotNull(partitionsList, nameof(partitionsList)), StringComparer.OrdinalIgnoreCase).ToList();
@@ -86,21 +89,16 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public void Dispose()
         {
-            Log.LogInformation($"RocksDbWrapper Dispose called");
             if (!this.isDisposed.GetAndSet(true))
             {
-                this.Backup();
                 this.db?.Dispose();
             }
         }
 
         static void RestoreDb(DbOptions dbOptions, string path, string backupPath)
         {
-            Log.LogInformation($"Restore called {backupPath}");
-
             if (Directory.Exists(backupPath))
             {
-                Log.LogInformation("backup Directory sizeon restore:" + GetDirectorySize(backupPath));
                 Events.RestoringFromBackup();
 
                 IntPtr backupEngine = Native.Instance.rocksdb_backup_engine_open(dbOptions.Handle, backupPath, out IntPtr err);
@@ -148,13 +146,38 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             }
         }
 
-        public void Backup()
+        public void Close()
         {
-            string backupPath1 = this.backupPath.OrDefault();
-            Log.LogInformation($"Backup called {backupPath1}");
-            Log.LogInformation("Directory size:" + GetDirectorySize(this.path));
-            Log.LogInformation("Backup Directory size:" + GetDirectorySize(backupPath1));
+            this.Backup();
+        }
 
+        static IEnumerable<string> ListColumnFamilies(DbOptions dbOptions, string path)
+        {
+            Preconditions.CheckNonWhiteSpace(path, nameof(path));
+            // ListColumnFamilies will throw if the DB doesn't exist yet, so wrap it in a try catch.
+            IEnumerable<string> columnFamilies = null;
+            try
+            {
+                columnFamilies = RocksDb.ListColumnFamilies(dbOptions, path);
+            }
+            catch
+            {
+                // ignored since ListColumnFamilies will throw if the DB doesn't exist yet.
+            }
+
+            return columnFamilies ?? Enumerable.Empty<string>();
+        }
+
+        static void LogIfNonZeroIntPtr(IntPtr input, Action logAction)
+        {
+            if (input != IntPtr.Zero)
+            {
+                logAction();
+            }
+        }
+
+        void Backup()
+        {
             if (this.useBackupAndRestore)
             {
                 Events.StartingBackup();
@@ -168,7 +191,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
                 IntPtr backupInfo = Native.Instance.rocksdb_backup_engine_get_backup_info(backupEngine);
                 int numberOfBackups = Native.Instance.rocksdb_backup_engine_info_count(backupInfo);
-                uint lastBackupId = Native.Instance.rocksdb_backup_engine_info_backup_id(backupInfo, numberOfBackups-1);
+                uint lastBackupId = Native.Instance.rocksdb_backup_engine_info_backup_id(backupInfo, numberOfBackups - 1);
 
                 Events.BackupInformation(
                     numberOfBackups - 1,
@@ -196,61 +219,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 backupEngine = IntPtr.Zero;
 
                 Events.BackupComplete();
-            }
-        }
-
-        public void Close()
-        {
-            this.Backup();
-        }
-
-        static long GetDirectorySize(string directoryPath)
-        {
-            if (!Directory.Exists(directoryPath))
-            {
-                return 0;
-            }
-
-            DirectoryInfo directory = new DirectoryInfo(directoryPath);
-            return GetDirectorySize(directory);
-        }
-
-        static long GetDirectorySize(DirectoryInfo directory)
-        {
-            long size = 0;
-
-            // Get size for all files in directory
-            FileInfo[] files = directory.GetFiles("*", SearchOption.AllDirectories);
-            foreach (FileInfo file in files)
-            {
-                size += file.Length;
-            }
-
-            return size;
-        }
-
-        static IEnumerable<string> ListColumnFamilies(DbOptions dbOptions, string path)
-        {
-            Preconditions.CheckNonWhiteSpace(path, nameof(path));
-            // ListColumnFamilies will throw if the DB doesn't exist yet, so wrap it in a try catch.
-            IEnumerable<string> columnFamilies = null;
-            try
-            {
-                columnFamilies = RocksDb.ListColumnFamilies(dbOptions, path);
-            }
-            catch
-            {
-                // ignored since ListColumnFamilies will throw if the DB doesn't exist yet.
-            }
-
-            return columnFamilies ?? Enumerable.Empty<string>();
-        }
-
-        static void LogIfNonZeroIntPtr(IntPtr input, Action logAction)
-        {
-            if (input != IntPtr.Zero)
-            {
-                logAction();
             }
         }
 

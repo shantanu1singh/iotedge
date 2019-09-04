@@ -108,11 +108,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public Iterator NewIterator(ColumnFamilyHandle handle) => this.db.NewIterator(handle);
 
-        public void Backup()
-        {
-            // No-op
-        }
-
         public void Close()
         {
             // No-op
