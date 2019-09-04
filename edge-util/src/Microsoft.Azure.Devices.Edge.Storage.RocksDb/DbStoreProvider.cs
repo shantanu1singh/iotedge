@@ -103,7 +103,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public void Dispose()
         {
-            Events.Dispose();
             this.Dispose(true);
             GC.SuppressFinalize(this);
         }
@@ -142,11 +141,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             {
                 StartingCompaction = IdStart,
                 StoreCompaction,
-            }
-
-            internal static void Dispose()
-            {
-                Log.LogInformation((int)EventIds.StartingCompaction, "DbStoreProvider Dispose");
             }
 
             internal static void StartingCompaction()

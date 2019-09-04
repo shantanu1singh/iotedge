@@ -559,8 +559,7 @@ namespace Microsoft.Azure.Devices.Routing.Core.Endpoints.StateMachine
             const string TimeSpanFormat = "c";
             const int IdStart = Routing.EventIds.EndpointExecutorFsm;
 
-            //static readonly ILogger Log = Routing.LoggerFactory.CreateLogger<EndpointExecutorFsm>();
-            static readonly ILogger Log = Logger.Factory.CreateLogger<EndpointExecutorFsm>();
+            static readonly ILogger Log = Routing.LoggerFactory.CreateLogger<EndpointExecutorFsm>();
 
             enum EventIds
             {
