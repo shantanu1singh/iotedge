@@ -167,13 +167,17 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                             catch (Exception ex) when (!ExceptionEx.IsFatal(ex))
                             {
                                 logger.LogError(ex, "Error creating RocksDB store. Falling back to in-memory store.");
-                                return new InMemoryDbStoreProvider();
+                                return new InMemoryDbStoreProvider(
+                                    Option.Some(this.storageBackupPath),
+                                    this.experimentalFeatures.EnableStorageBackupAndRestore);
                             }
                         }
                         else
                         {
                             logger.LogInformation($"Using in-memory store");
-                            return new InMemoryDbStoreProvider();
+                            return new InMemoryDbStoreProvider(
+                                Option.Some(this.storageBackupPath),
+                                this.experimentalFeatures.EnableStorageBackupAndRestore);
                         }
                     })
                 .As<IDbStoreProvider>()

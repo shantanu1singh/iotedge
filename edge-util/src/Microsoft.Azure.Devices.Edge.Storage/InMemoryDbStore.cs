@@ -4,23 +4,75 @@ namespace Microsoft.Azure.Devices.Edge.Storage
     using System;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
+    using System.IO;
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Util;
+    using Microsoft.Extensions.Logging;
     using Nito.AsyncEx;
+    using ProtoBuf;
 
     /// <summary>
     /// Provides an in memory implementation of the IDbStore
     /// </summary>
     class InMemoryDbStore : IDbStore
     {
+        private const string BackupMetadataFileName = "meta.bin";
         readonly ItemKeyedCollection keyValues;
         readonly AsyncReaderWriterLock listLock = new AsyncReaderWriterLock();
+        readonly string dbName;
+        readonly Option<string> backupPath;
+        readonly bool useBackupAndRestore;
 
-        public InMemoryDbStore()
+        public InMemoryDbStore(string dbName)
         {
+            Preconditions.CheckNonWhiteSpace(dbName, nameof(dbName));
+            this.dbName = dbName;
+            this.useBackupAndRestore = false;
+            this.backupPath = Option.None<string>();
             this.keyValues = new ItemKeyedCollection(new ByteArrayComparer());
+
+            // Restore from a previous backup if enabled.
+            if (this.useBackupAndRestore)
+            {
+                string backupPathValue = this.backupPath.Expect(() => new ArgumentException($"The value of {nameof(backupPath)} needs to be specified if backup and restore is enabled."));
+                Preconditions.CheckNonWhiteSpace(backupPathValue, nameof(backupPath));
+
+                this.RestoreDb(dbName, backupPathValue);
+            }
+        }
+
+        public InMemoryDbStore(string dbName, string backupPath)
+        {
+            Preconditions.CheckNonWhiteSpace(backupPath, nameof(backupPath));
+            this.RestoreDb(dbName, backupPath);
+        }
+
+        private void RestoreDb(string dbName, string backupPath)
+        {
+            string dbBackupPath = Path.Combine(backupPath, $"${dbName}.bin");
+            if (!File.Exists(dbBackupPath))
+            {
+                Events.NoBackupsForRestore();
+                return;
+            }
+
+            try
+            {
+                using (FileStream file = File.OpenRead(dbBackupPath))
+                {
+                    IList<Item> backedUpItems = Serializer.Deserialize<IList<Item>>(file);
+                    foreach (Item item in backedUpItems)
+                    {
+                        this.keyValues.Add(item);
+                    }
+                }
+            }
+            catch (IOException exception)
+            {
+                Events.RestoreFailure($"The restore operation failed with error ${exception}.");
+            }
         }
 
         public Task Put(byte[] key, byte[] value) => this.Put(key, value, CancellationToken.None);
@@ -120,6 +172,42 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
         }
 
+        public void Close()
+        {
+            //this.CloseAsync().Wait();
+        }
+
+        public async Task BackupAsync(string backupPath)
+        {
+            await this.CloseAsync(backupPath);
+        }
+
+        public async Task CloseAsync(string backupPath)
+        {
+            if (this.useBackupAndRestore)
+            {
+                string newBackupPath = Path.Combine(backupPath, $"${this.dbName}.bin");
+                try
+                {
+                    using (FileStream file = File.Create(newBackupPath))
+                    {
+                        using (await this.listLock.WriterLockAsync(CancellationToken.None))
+                        {
+                            Serializer.Serialize(file, this.keyValues.AllItems);
+                        }
+                    }
+                }
+                catch (IOException exception)
+                {
+                    Events.BackupFailure($"The backup operation failed with error ${exception}. Deleting left-over backup artifacts.");
+                    if (File.Exists(newBackupPath))
+                    {
+                        File.Delete(newBackupPath);
+                    }
+                }
+            }
+        }
+
         public void Dispose()
         {
             // No-op
@@ -162,6 +250,23 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
         }
 
+        [ProtoContract]
+        class BackupMetadata
+        {
+            public BackupMetadata(Guid latestBackupId, DateTime latestBackupTimestampUtc)
+            {
+                this.LatestBackupId = latestBackupId;
+                this.LatestBackupTimestampUtc = latestBackupTimestampUtc;
+            }
+
+            [ProtoMember(1)]
+            public Guid LatestBackupId { get; }
+
+            [ProtoMember(2)]
+            public DateTime LatestBackupTimestampUtc { get; set; }
+        }
+
+        [ProtoContract]
         class Item
         {
             public Item(byte[] key, byte[] value)
@@ -170,8 +275,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 this.Value = Preconditions.CheckNotNull(value, nameof(value));
             }
 
+            [ProtoMember(1)]
             public byte[] Key { get; }
 
+            [ProtoMember(2)]
             public byte[] Value { get; set; }
         }
 
@@ -186,7 +293,73 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 .Select(i => (i.Key, i.Value))
                 .ToList();
 
+            internal IList<Item> AllItems => this.Items;
+
             protected override byte[] GetKeyForItem(Item item) => item.Key;
+        }
+
+        static class Events
+        {
+            const int IdStart = UtilEventsIds.InMemoryDbStore;
+            static readonly ILogger Log = Logger.Factory.CreateLogger<InMemoryDbStore>();
+
+            enum EventIds
+            {
+                StartingBackup = IdStart,
+                BackupComplete,
+                BackupDirectoryNotFound,
+                BackupInformation,
+                BackupFailure,
+                RestoringFromBackup,
+                NoBackupsForRestore,
+                RestoreComplete,
+                RestoreFailure
+            }
+
+            internal static void StartingBackup()
+            {
+                Log.LogInformation((int)EventIds.StartingBackup, "Starting backup of database.");
+            }
+
+            internal static void BackupComplete()
+            {
+                Log.LogInformation((int)EventIds.BackupComplete, $"Backup of database complete.");
+            }
+
+            internal static void BackupDirectoryNotFound(string backupDirectoryPath)
+            {
+                Log.LogInformation((int)EventIds.BackupDirectoryNotFound, $"The database backup directory {backupDirectoryPath} doesn't exist.");
+            }
+
+            internal static void BackupInformation(Guid backupId, DateTime backupTimestamp)
+            {
+                Log.LogDebug((int)EventIds.BackupInformation, $"Backup Info: Timestamp={backupTimestamp}, ID={backupId}.");
+            }
+
+            internal static void BackupFailure(string details = null)
+            {
+                Log.LogError((int)EventIds.BackupFailure, $"Error occurred while attempting to create a database backup. Details: {details}.");
+            }
+
+            internal static void RestoringFromBackup()
+            {
+                Log.LogInformation((int)EventIds.RestoringFromBackup, "Starting restore of database from last backup.");
+            }
+
+            internal static void NoBackupsForRestore()
+            {
+                Log.LogInformation((int)EventIds.NoBackupsForRestore, "No backups were found to restore database with.");
+            }
+
+            internal static void RestoreComplete()
+            {
+                Log.LogInformation((int)EventIds.RestoreComplete, "Database restore from backup complete.");
+            }
+
+            internal static void RestoreFailure(string details = null)
+            {
+                Log.LogError((int)EventIds.RestoreFailure, $"Error occurred while attempting a database restore from the last available backup. Details: {details}.");
+            }
         }
     }
 }

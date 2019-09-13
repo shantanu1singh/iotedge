@@ -35,7 +35,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.Test
 
             yield return new object[]
             {
-                new InMemoryDbStore(),
+                new InMemoryDbStore(string.Empty),
                 new BytesMapper<string>(),
                 new BytesMapper<string>(),
                 stringData
@@ -43,7 +43,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.Test
 
             yield return new object[]
             {
-                new InMemoryDbStore(),
+                new InMemoryDbStore(string.Empty),
                 new BytesMapper<TestClass>(),
                 new BytesMapper<TestClass>(),
                 objectData
@@ -51,7 +51,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.Test
 
             yield return new object[]
             {
-                new InMemoryDbStore(),
+                new InMemoryDbStore(string.Empty),
                 new BytesMapper<string>(),
                 new BytesMapper<TestClass>(),
                 objectData2
@@ -59,7 +59,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.Test
 
             yield return new object[]
             {
-                new KeyValueStoreMapper<string, byte[], string, byte[]>(new InMemoryDbStore(), new BytesMapper<string>(), new BytesMapper<string>()),
+                new KeyValueStoreMapper<string, byte[], string, byte[]>(new InMemoryDbStore(string.Empty), new BytesMapper<string>(), new BytesMapper<string>()),
                 new JsonMapper<string>(),
                 new JsonMapper<TestClass>(),
                 objectData2
@@ -67,7 +67,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.Test
 
             yield return new object[]
             {
-                new KeyValueStoreMapper<string, byte[], string, byte[]>(new InMemoryDbStore(), new BytesMapper<string>(), new BytesMapper<string>()),
+                new KeyValueStoreMapper<string, byte[], string, byte[]>(new InMemoryDbStore(string.Empty), new BytesMapper<string>(), new BytesMapper<string>()),
                 new JsonMapper<TestClass>(),
                 new JsonMapper<TestClass>(),
                 objectData
