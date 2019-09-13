@@ -139,6 +139,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         [ProtoContract]
         class BackupMetadataList
         {
+            public BackupMetadataList()
+            {
+            }
+
             public BackupMetadataList(IList<BackupMetadata> backups)
             {
                 this.Backups = backups;
@@ -151,6 +155,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         [ProtoContract]
         class BackupMetadata
         {
+            public BackupMetadata()
+            {
+            }
+
             public BackupMetadata(Guid id, DateTime timestampUtc, IList<string> stores)
             {
                 this.Id = id;
