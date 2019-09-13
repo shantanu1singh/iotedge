@@ -51,7 +51,8 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         private void RestoreDb(string dbName, string backupPath)
         {
-            string dbBackupPath = Path.Combine(backupPath, $"{dbName}.bin");
+            string backupFileName = Hash.CreateSha256(dbName);
+            string dbBackupPath = Path.Combine(backupPath, $"{backupFileName}.bin");
             if (!File.Exists(dbBackupPath))
             {
                 Events.NoBackupsForRestore();
@@ -185,7 +186,8 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         public async Task CloseAsync(string backupPath)
         {
-            string newBackupPath = Path.Combine(backupPath, $"{this.dbName}.bin");
+            string backupFileName = Hash.CreateSha256(this.dbName);
+            string newBackupPath = Path.Combine(backupPath, $"{backupFileName}.bin");
             try
             {
                 using (FileStream file = File.Create(newBackupPath))
