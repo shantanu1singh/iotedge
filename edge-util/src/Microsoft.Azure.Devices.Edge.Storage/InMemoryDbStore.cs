@@ -179,31 +179,29 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         public async Task BackupAsync(string backupPath)
         {
+            Events.StartingBackup();
             await this.CloseAsync(backupPath);
         }
 
         public async Task CloseAsync(string backupPath)
         {
-            if (this.useBackupAndRestore)
+            string newBackupPath = Path.Combine(backupPath, $"${this.dbName}.bin");
+            try
             {
-                string newBackupPath = Path.Combine(backupPath, $"${this.dbName}.bin");
-                try
+                using (FileStream file = File.Create(newBackupPath))
                 {
-                    using (FileStream file = File.Create(newBackupPath))
+                    using (await this.listLock.WriterLockAsync(CancellationToken.None))
                     {
-                        using (await this.listLock.WriterLockAsync(CancellationToken.None))
-                        {
-                            Serializer.Serialize(file, this.keyValues.AllItems);
-                        }
+                        Serializer.Serialize(file, this.keyValues.AllItems);
                     }
                 }
-                catch (IOException exception)
+            }
+            catch (IOException exception)
+            {
+                Events.BackupFailure($"The backup operation failed with error ${exception}. Deleting left-over backup artifacts.");
+                if (File.Exists(newBackupPath))
                 {
-                    Events.BackupFailure($"The backup operation failed with error ${exception}. Deleting left-over backup artifacts.");
-                    if (File.Exists(newBackupPath))
-                    {
-                        File.Delete(newBackupPath);
-                    }
+                    File.Delete(newBackupPath);
                 }
             }
         }

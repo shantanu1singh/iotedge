@@ -102,6 +102,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         {
             if (this.useBackupAndRestore)
             {
+                Events.StartingBackup();
                 string backupPathValue = this.backupPath.Expect(() => new InvalidOperationException($"The value of {nameof(this.backupPath)} is expected to be a valid path if backup and restore is enabled."));
                 Guid backupId = Guid.NewGuid();
                 string dbBackupDirectory = Path.Combine(backupPathValue, backupId.ToString());
