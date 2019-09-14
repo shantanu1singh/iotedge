@@ -45,6 +45,12 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         public InMemoryDbStore(string dbName, string backupPath)
         {
+            Preconditions.CheckNonWhiteSpace(dbName, nameof(dbName));
+            this.dbName = dbName;
+            this.useBackupAndRestore = false;
+            this.backupPath = Option.None<string>();
+            this.keyValues = new ItemKeyedCollection(new ByteArrayComparer());
+
             Preconditions.CheckNonWhiteSpace(backupPath, nameof(backupPath));
             this.RestoreDb(dbName, backupPath);
         }
