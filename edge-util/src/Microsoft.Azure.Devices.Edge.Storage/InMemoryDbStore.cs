@@ -51,7 +51,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         private void RestoreDb(string dbName, string backupPath)
         {
+            Events.RestoringFromBackup(dbName);
             string backupFileName = Hash.CreateSha1AsHex(dbName);
+            Events.RestoringFromBackup(backupFileName);
             string dbBackupPath = Path.Combine(backupPath, $"{backupFileName}.bin");
             if (!File.Exists(dbBackupPath))
             {
@@ -270,6 +272,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         [ProtoContract]
         class Item
         {
+            private Item()
+            {
+            }
+
             public Item(byte[] key, byte[] value)
             {
                 this.Key = Preconditions.CheckNotNull(key, nameof(key));
@@ -342,9 +348,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 Log.LogError((int)EventIds.BackupFailure, $"Error occurred while attempting to create a database backup. Details: {details}.");
             }
 
-            internal static void RestoringFromBackup()
+            internal static void RestoringFromBackup(string data = null)
             {
-                Log.LogInformation((int)EventIds.RestoringFromBackup, "Starting restore of database from last backup.");
+                Log.LogInformation((int)EventIds.RestoringFromBackup, $"Starting restore of database from last backup. {data}");
             }
 
             internal static void NoBackupsForRestore()

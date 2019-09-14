@@ -140,7 +140,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         [ProtoContract]
         class BackupMetadataList
         {
-            public BackupMetadataList()
+            private BackupMetadataList()
             {
             }
 
@@ -156,7 +156,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         [ProtoContract]
         class BackupMetadata
         {
-            public BackupMetadata()
+            private BackupMetadata()
             {
             }
 
