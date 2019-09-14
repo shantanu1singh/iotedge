@@ -186,6 +186,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         public async Task CloseAsync(string backupPath)
         {
+            Events.StartingBackup(this.dbName);
             string backupFileName = Hash.CreateSha256(this.dbName);
             string newBackupPath = Path.Combine(backupPath, $"{backupFileName}.bin");
             try
@@ -316,9 +317,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 RestoreFailure
             }
 
-            internal static void StartingBackup()
+            internal static void StartingBackup(string data = null)
             {
-                Log.LogInformation((int)EventIds.StartingBackup, "Starting backup of database.");
+                Log.LogInformation((int)EventIds.StartingBackup, $"Starting backup of database. {data}");
             }
 
             internal static void BackupComplete()
