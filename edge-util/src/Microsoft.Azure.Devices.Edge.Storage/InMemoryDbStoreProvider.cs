@@ -116,9 +116,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                     }
 
                     BackupMetadata newBackupMetadata = new BackupMetadata(backupId, DateTime.UtcNow, this.partitionDbStoreDictionary.Keys.ToList());
+                    BackupMetadataList backupMetadataList = new BackupMetadataList(new List<BackupMetadata> { newBackupMetadata });
                     using (FileStream file = File.Create(Path.Combine(backupPathValue, BackupMetadataFileName)))
                     {
-                        Serializer.Serialize(file, newBackupMetadata);
+                        Serializer.Serialize(file, backupMetadataList);
                     }
                 }
                 catch (IOException exception)
