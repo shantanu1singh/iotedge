@@ -152,7 +152,25 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                     IStorageSpaceChecker dickSpaceChecker = storageSpaceCheckConfiguration.Enabled && this.usePersistentStorage
                         ? DiskSpaceChecker.Create(this.storagePath, storageSpaceCheckConfiguration.MaxStorageBytes, storageSpaceCheckConfiguration.CheckFrequency)
                         : new NullStorageSpaceChecker() as IStorageSpaceChecker;
-                    return dickSpaceChecker;
+
+                    IStorageSpaceChecker checker = null;
+                    if (storageSpaceCheckConfiguration.Enabled)
+                    {
+                        if (this.usePersistentStorage)
+                        {
+                            DiskSpaceChecker.Create(this.storagePath, storageSpaceCheckConfiguration.MaxStorageBytes, storageSpaceCheckConfiguration.CheckFrequency);
+                        }
+                        else
+                        {
+                            new MemorySpaceChecker(storageSpaceCheckConfiguration.CheckFrequency, storageSpaceCheckConfiguration.MaxStorageBytes, () => Task.FromResult((long)0));
+                        }
+                    }
+                    else
+                    {
+                        checker = new NullStorageSpaceChecker() as IStorageSpaceChecker;
+                    }
+
+                    return checker;
                 })
                 .As<IStorageSpaceChecker>()
                 .SingleInstance();
@@ -188,8 +206,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                         }
                         else
                         {
+                            var memorySpaceChecker = c.Resolve<IStorageSpaceChecker>();
                             logger.LogInformation($"Using in-memory store");
-                            return new InMemoryDbStoreProvider();
+                            return new InMemoryDbStoreProvider(Option.Some(memorySpaceChecker));
                         }
                     })
                 .As<IDbStoreProvider>()

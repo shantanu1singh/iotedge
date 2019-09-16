@@ -2,11 +2,15 @@
 namespace Microsoft.Azure.Devices.Edge.Storage
 {
     using System.Collections.Concurrent;
+    using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Storage.Disk;
     using Microsoft.Azure.Devices.Edge.Util;
+    using Microsoft.Extensions.Logging;
 
     public class InMemoryDbStoreProvider : IDbStoreProvider
     {
+        static readonly ILogger Log = Logger.Factory.CreateLogger<InMemoryDbStoreProvider>();
+
         const string DefaultPartitionName = "$Default";
         readonly ConcurrentDictionary<string, InMemoryDbStore> partitionDbStoreDictionary = new ConcurrentDictionary<string, InMemoryDbStore>();
         readonly Option<IStorageSpaceChecker> memoryStorageSpaceChecker;
@@ -48,12 +52,13 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             // No-op
         }
 
-        long GetTotalMemoryUsage()
+        async Task<long> GetTotalMemoryUsage()
         {
             long dbSizeInBytes = 0;
-            foreach (InMemoryDbStore inMemoryDbStore in this.partitionDbStoreDictionary.Values)
+            foreach (var inMemoryDbStore in this.partitionDbStoreDictionary)
             {
-                dbSizeInBytes += inMemoryDbStore.GetDbSizeInBytes();
+                dbSizeInBytes += await inMemoryDbStore.Value.GetDbSizeInBytes();
+                Log.LogInformation($"Db Name: {inMemoryDbStore.Key} . DB size {dbSizeInBytes}");
             }
 
             return dbSizeInBytes;

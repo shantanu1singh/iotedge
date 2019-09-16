@@ -21,10 +21,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
 
         readonly PeriodicTask storageSpaceChecker;
         long maxStorageSpaceBytes;
-        Func<long> getTotalMemoryUsage;
+        Func<Task<long>> getTotalMemoryUsage;
         MemoryUsageStatus memoryUsageStatus;
 
-        MemorySpaceChecker(TimeSpan checkFrequency, long maxStorageSpaceBytes, Func<long> getTotalMemoryUsage)
+        public MemorySpaceChecker(TimeSpan checkFrequency, long maxStorageSpaceBytes, Func<Task<long>> getTotalMemoryUsage)
         {
             Preconditions.CheckNotNull(getTotalMemoryUsage, nameof(getTotalMemoryUsage));
             this.maxStorageSpaceBytes = maxStorageSpaceBytes;
@@ -32,7 +32,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
             this.storageSpaceChecker = new PeriodicTask(this.PeriodicTaskCallback, checkFrequency, TimeSpan.FromSeconds(5), Events.Log, "Memory usage check");
         }
 
-        public Func<long> GetTotalMemoryUsage
+        public Func<Task<long>> GetTotalMemoryUsage
         {
             get { return this.getTotalMemoryUsage; }
             set
@@ -44,10 +44,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
 
         public bool IsFull => this.memoryUsageStatus == MemoryUsageStatus.Full;
 
-        public void SetStorageUsageComputer(Func<long> storageUsageComputer)
-        {
-            this.getTotalMemoryUsage = storageUsageComputer;
-        }
+        public void SetStorageUsageComputer(Func<Task<long>> storageUsageComputer) => this.getTotalMemoryUsage = storageUsageComputer;
 
         public void SetMaxStorageSize(long maxStorageBytes)
         {
@@ -55,17 +52,11 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
             this.maxStorageSpaceBytes = maxStorageBytes;
         }
 
-        Task PeriodicTaskCallback()
-        {
-            this.UpdateCurrentDiskSpaceStatus();
-            return Task.CompletedTask;
-        }
-
-        void UpdateCurrentDiskSpaceStatus()
+        async Task PeriodicTaskCallback()
         {
             try
             {
-                this.memoryUsageStatus = this.GetMemoryUsageStatus();
+                this.memoryUsageStatus = await this.GetMemoryUsageStatus();
             }
             catch (Exception e)
             {
@@ -73,10 +64,15 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
             }
         }
 
-        MemoryUsageStatus GetMemoryUsageStatus()
+        async Task<MemoryUsageStatus> GetMemoryUsageStatus()
         {
-            long memoryUsageBytes = this.getTotalMemoryUsage();
+            long memoryUsageBytes = await this.getTotalMemoryUsage();
+            Events.Log.LogInformation($"Memory usage bytes: {memoryUsageBytes}");
+            Events.Log.LogInformation($"Memory limit bytes: {this.maxStorageSpaceBytes}");
+
             double usagePercentage = (double)memoryUsageBytes * 100 / this.maxStorageSpaceBytes;
+            Events.Log.LogInformation($"Usage %: {usagePercentage}");
+
             MemoryUsageStatus memoryUsageStatus = GetMemoryUsageStatus(usagePercentage);
             if (memoryUsageStatus != MemoryUsageStatus.Available)
             {

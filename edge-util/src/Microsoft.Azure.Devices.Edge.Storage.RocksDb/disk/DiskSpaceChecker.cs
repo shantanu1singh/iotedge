@@ -4,6 +4,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
     using System;
     using System.IO;
     using System.Linq;
+    using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Storage.Disk;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Extensions.Logging;
@@ -32,7 +33,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
             return diskSpaceChecker;
         }
 
-        public void SetStorageUsageComputer(Func<long> storageUsageComputer)
+        public void SetStorageUsageComputer(Func<Task<long>> storageUsageComputer)
         {
             throw new NotSupportedException("Setting the storage usage computer for disk based checkers isn't supported.");
         }

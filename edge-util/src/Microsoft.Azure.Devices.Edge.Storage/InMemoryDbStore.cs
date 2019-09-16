@@ -124,6 +124,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         {
             // No-op
         }
+
         public async Task<long> GetDbSizeInBytes()
         {
             long dbSize = 0;
