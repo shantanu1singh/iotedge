@@ -32,6 +32,11 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
             return diskSpaceChecker;
         }
 
+        public void SetStorageUsageComputer(Func<long> storageUsageComputer)
+        {
+            throw new NotSupportedException("Setting the storage usage computer for disk based checkers isn't supported.");
+        }
+
         public void SetMaxStorageSize(long maxStorageBytes)
         {
             lock (this.updateLock)

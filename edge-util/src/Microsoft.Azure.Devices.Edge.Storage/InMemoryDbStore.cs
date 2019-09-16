@@ -124,6 +124,19 @@ namespace Microsoft.Azure.Devices.Edge.Storage
         {
             // No-op
         }
+        public async Task<long> GetDbSizeInBytes()
+        {
+            long dbSize = 0;
+            using (await this.listLock.ReaderLockAsync(CancellationToken.None))
+            {
+                foreach (Item keyValue in this.keyValues)
+                {
+                    dbSize += (keyValue.Key.Length + keyValue.Value.Length);
+                }
+            }
+
+            return dbSize;
+        }
 
         async Task IterateBatch(List<(byte[] key, byte[] value)> snapshot, int index, int batchSize, Func<byte[], byte[], Task> callback, CancellationToken cancellationToken)
         {
@@ -145,6 +158,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 return new List<(byte[], byte[])>(this.keyValues.ItemList);
             }
         }
+
 
         class ByteArrayComparer : IEqualityComparer<byte[]>
         {
