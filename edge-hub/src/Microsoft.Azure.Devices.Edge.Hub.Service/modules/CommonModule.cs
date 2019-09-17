@@ -149,10 +149,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                 c =>
                 {
                     StorageSpaceCheckConfiguration storageSpaceCheckConfiguration = this.experimentalFeatures.StorageSpaceCheckConfiguration;
-                    IStorageSpaceChecker dickSpaceChecker = storageSpaceCheckConfiguration.Enabled && this.usePersistentStorage
-                        ? DiskSpaceChecker.Create(this.storagePath, storageSpaceCheckConfiguration.MaxStorageBytes, storageSpaceCheckConfiguration.CheckFrequency)
-                        : new NullStorageSpaceChecker() as IStorageSpaceChecker;
-
                     IStorageSpaceChecker checker = null;
                     if (storageSpaceCheckConfiguration.Enabled)
                     {

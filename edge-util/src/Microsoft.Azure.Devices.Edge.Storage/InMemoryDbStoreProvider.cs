@@ -32,10 +32,15 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
         }
 
+        static InMemoryDbStore BuildInMemoryDbStore(Option<IStorageSpaceChecker> memoryStorageSpaceChecker)
+            => memoryStorageSpaceChecker
+                .Map(d => new MemoryUsageAwareInMemoryDbStore(d) as InMemoryDbStore)
+                .GetOrElse(new InMemoryDbStore());
+
         public IDbStore GetDbStore(string partitionName)
         {
             Preconditions.CheckNonWhiteSpace(partitionName, nameof(partitionName));
-            IDbStore dbStore = this.partitionDbStoreDictionary.GetOrAdd(partitionName, new InMemoryDbStore());
+            IDbStore dbStore = this.partitionDbStoreDictionary.GetOrAdd(partitionName, BuildInMemoryDbStore(this.memoryStorageSpaceChecker));
             return dbStore;
         }
 

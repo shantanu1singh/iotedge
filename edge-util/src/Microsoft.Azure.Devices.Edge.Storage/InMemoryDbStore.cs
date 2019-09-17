@@ -23,7 +23,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             this.keyValues = new ItemKeyedCollection(new ByteArrayComparer());
         }
 
-        public Task Put(byte[] key, byte[] value) => this.Put(key, value, CancellationToken.None);
+        public virtual Task Put(byte[] key, byte[] value) => this.Put(key, value, CancellationToken.None);
 
         public Task<Option<byte[]>> Get(byte[] key) => this.Get(key, CancellationToken.None);
 
@@ -97,7 +97,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
         }
 
-        public async Task Put(byte[] key, byte[] value, CancellationToken cancellationToken)
+        public virtual async Task Put(byte[] key, byte[] value, CancellationToken cancellationToken)
         {
             using (await this.listLock.WriterLockAsync(cancellationToken))
             {
