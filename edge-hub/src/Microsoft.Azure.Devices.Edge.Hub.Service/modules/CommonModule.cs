@@ -154,11 +154,11 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                     {
                         if (this.usePersistentStorage)
                         {
-                            DiskSpaceChecker.Create(this.storagePath, storageSpaceCheckConfiguration.MaxStorageBytes, storageSpaceCheckConfiguration.CheckFrequency);
+                            checker = DiskSpaceChecker.Create(this.storagePath, storageSpaceCheckConfiguration.MaxStorageBytes, storageSpaceCheckConfiguration.CheckFrequency) as IStorageSpaceChecker;
                         }
                         else
                         {
-                            new MemorySpaceChecker(storageSpaceCheckConfiguration.CheckFrequency, storageSpaceCheckConfiguration.MaxStorageBytes, () => Task.FromResult((long)0));
+                            checker = new MemorySpaceChecker(storageSpaceCheckConfiguration.CheckFrequency, storageSpaceCheckConfiguration.MaxStorageBytes, () => Task.FromResult((long)0)) as IStorageSpaceChecker;
                         }
                     }
                     else
