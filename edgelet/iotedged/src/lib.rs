@@ -26,6 +26,7 @@ use std::env;
 use std::fs;
 use std::fs::{DirBuilder, File, OpenOptions};
 use std::io::{Read, Write};
+//use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -51,7 +52,7 @@ use edgelet_core::crypto::{
 use edgelet_core::watchdog::Watchdog;
 use edgelet_core::{
     AttestationMethod, Authenticator, Certificate, CertificateIssuer, CertificateProperties,
-    CertificateType, Dps, External, MakeModuleRuntime, ManualAuthMethod,
+    CertificateType, Dps, MakeModuleRuntime, ManualAuthMethod,
     ManualDeviceConnectionString, ManualX509Auth, Module, ModuleRuntime, ModuleRuntimeErrorReason,
     ModuleSpec, Provisioning, ProvisioningResult as CoreProvisioningResult, RuntimeSettings,
     SymmetricKeyAttestationInfo, TpmAttestationInfo, WorkloadConfig,
@@ -261,7 +262,7 @@ where
         let mut tokio_runtime = tokio::runtime::Runtime::new()
             .context(ErrorKind::Initialize(InitializeErrorReason::Tokio))?;
 
-        let external_provisioning_info =
+        let (external_provisioning_info, external_provisioning) =
             get_external_provisioning_info(&settings, &mut tokio_runtime)?;
 
         set_iot_edge_env_vars(&settings, &external_provisioning_info)
@@ -307,7 +308,7 @@ where
             ))?;
 
         macro_rules! start_edgelet {
-            ($key_store:ident, $provisioning_result:ident, $root_key:ident, $force_reprovision:ident, $id_cert_thumprint:ident,) => {{
+            ($key_store:ident, $provisioning_result:ident, $root_key:ident, $force_reprovision:ident, $id_cert_thumprint:ident, $provision:ident,) => {{
                 info!("Finished provisioning edge device.");
 
                 let runtime = init_runtime::<M>(
@@ -355,7 +356,7 @@ where
                 // This "do-while" loop runs until a StartApiReturnStatus::Shutdown
                 // is received. If the TLS cert needs a restart, we will loop again.
                 loop {
-                    let code = start_api::<_, _, _, _, _, M>(
+                    let code = start_api::<_, _, _, _, _, M, _>(
                         &settings,
                         hyper_client.clone(),
                         &runtime,
@@ -365,6 +366,7 @@ where
                         make_shutdown_signal(),
                         &crypto,
                         &mut tokio_runtime,
+                        $provision,
                     )?;
 
                     if code != StartApiReturnStatus::Restart {
@@ -393,12 +395,15 @@ where
                         info!("Starting provisioning edge device via manual mode using a device connection string...");
                         let (key_store, provisioning_result, root_key) =
                             manual_provision_connection_string(&cs, &mut tokio_runtime)?;
+
+                        let p = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
+                            p,
                         );
                     }
                     ManualAuthMethod::X509(x509) => {
@@ -419,12 +424,14 @@ where
                             id_data.thumbprint.clone(),
                         )?;
                         let thumbprint_op = Some(id_data.thumbprint.as_str());
+                        let p = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
+                            p,
                         );
                     }
                 };
@@ -449,6 +456,8 @@ where
                     )));
                 };
 
+                let y = external_provisioning.as_ref();
+
                 match credentials.auth_type() {
                     AuthType::SymmetricKey(symmetric_key) => {
                         if let Some(key) = symmetric_key.key() {
@@ -459,6 +468,7 @@ where
                                 memory_key,
                                 force_module_reprovision,
                                 None,
+                                y,
                             );
                         } else {
                             let (derived_key_store, tpm_key) =
@@ -469,6 +479,7 @@ where
                                 tpm_key,
                                 force_module_reprovision,
                                 None,
+                                y,
                             );
                         }
                     }
@@ -494,6 +505,7 @@ where
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
+                            y,
                         );
                     }
                 };
@@ -512,12 +524,15 @@ where
                             tpm,
                             hsm_lock.clone(),
                         )?;
+
+                        let p = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
+                            p,
                         );
                     }
                     AttestationMethod::SymmetricKey(ref symmetric_key_info) => {
@@ -530,12 +545,15 @@ where
                                 &mut tokio_runtime,
                                 symmetric_key_info,
                             )?;
+
+                        let p = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
+                            p,
                         );
                     }
                     AttestationMethod::X509(ref x509_info) => {
@@ -565,12 +583,14 @@ where
                             id_data.thumbprint.clone(),
                         )?;
                         let thumbprint_op = Some(id_data.thumbprint.as_str());
+                        let p = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
+                            p,
                         );
                     }
                 }
@@ -583,19 +603,13 @@ where
 }
 
 fn retrieve_external_provisioning_info(
-    external: &External,
+    external_provisioning: &ExternalProvisioning<ExternalProvisioningClient, MemoryKeyStore>,
     tokio_runtime: &mut tokio::runtime::Runtime,
-) -> Result<ProvisioningResult, Error> {
+) -> Result<ProvisioningResult, Error>
+{
     info!("Retrieving provisioning information from the external endpoint...");
-    let external_provisioning_client = ExternalProvisioningClient::new(external.endpoint())
-        .context(ErrorKind::Initialize(
-            InitializeErrorReason::ExternalProvisioningClient(
-                ExternalProvisioningErrorReason::ClientInitialization,
-            ),
-        ))?;
-    let external_provisioning = ExternalProvisioning::new(external_provisioning_client);
-
     let provision_fut = external_provisioning
+        .clone()
         .provision(MemoryKeyStore::new())
         .map_err(|err| {
             Error::from(err.context(ErrorKind::Initialize(
@@ -611,7 +625,7 @@ fn retrieve_external_provisioning_info(
 fn get_external_provisioning_info<S>(
     settings: &S,
     tokio_runtime: &mut tokio::runtime::Runtime,
-) -> Result<Option<ProvisioningResult>, Error>
+) -> Result<(Option<ProvisioningResult>, Option<ExternalProvisioning<ExternalProvisioningClient, MemoryKeyStore>>), Error>
 where
     S: RuntimeSettings,
 {
@@ -622,7 +636,14 @@ where
             external.endpoint().as_str(),
         );
 
-        let prov_info = retrieve_external_provisioning_info(external, tokio_runtime)?;
+        let external_provisioning_client = ExternalProvisioningClient::new(external.endpoint())
+            .context(ErrorKind::Initialize(
+                InitializeErrorReason::ExternalProvisioningClient(
+                    ExternalProvisioningErrorReason::ClientInitialization,
+                ),
+            ))?;
+        let external_provisioning = ExternalProvisioning::new(external_provisioning_client);
+        let prov_info = retrieve_external_provisioning_info(&external_provisioning, tokio_runtime)?;
 
         if let Some(credentials) = prov_info.credentials() {
             if let CredentialSource::Payload = credentials.source() {
@@ -680,9 +701,9 @@ where
             }
         };
 
-        Ok(Some(prov_info))
+        Ok((Some(prov_info), Some(external_provisioning)))
     } else {
-        Ok(None)
+        Ok((None, None))
     }
 }
 
@@ -1328,7 +1349,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn start_api<HC, K, F, C, W, M>(
+fn start_api<HC, K, F, C, W, M, P>(
     settings: &M::Settings,
     hyper_client: HC,
     runtime: &M::ModuleRuntime,
@@ -1338,6 +1359,7 @@ fn start_api<HC, K, F, C, W, M>(
     shutdown_signal: F,
     crypto: &C,
     tokio_runtime: &mut tokio::runtime::Runtime,
+    provisioning: Option<&P>,
 ) -> Result<StartApiReturnStatus, Error>
 where
     F: Future<Item = (), Error = ()> + Send + 'static,
@@ -1353,6 +1375,7 @@ where
         + Sync
         + 'static,
     W: WorkloadConfig + Clone + Send + Sync + 'static,
+    P: Provision + Clone + Send + Sync + 'static,
     M::ModuleRuntime: Authenticator<Request = Request<Body>> + Send + Sync + Clone + 'static,
     M: MakeModuleRuntime + 'static,
     <<M::ModuleRuntime as ModuleRuntime>::Module as Module>::Config:
@@ -1412,7 +1435,7 @@ where
     let cert_manager = Arc::new(cert_manager);
 
     let mgmt =
-        start_management::<_, _, _, M>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone());
+        start_management::<_, _, _, M, _>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone(), provisioning);
 
     let workload = start_workload::<_, _, _, _, M>(
         settings,
@@ -1897,17 +1920,23 @@ where
     env
 }
 
-fn start_management<C, K, HC, M>(
+//trait AssetTrait {
+//    fn load(path: ManualProvisioning) -> Self;
+//}
+
+fn start_management<C, K, HC, M, P>(
     settings: &M::Settings,
     runtime: &M::ModuleRuntime,
     id_man: &HubIdentityManager<DerivedKeyStore<K>, HC, K>,
     shutdown: Receiver<()>,
     cert_manager: Arc<CertificateManager<C>>,
+    provision: Option<&P>,
 ) -> impl Future<Item = (), Error = Error>
 where
     C: CreateCertificate + Clone,
     K: 'static + Sign + Clone + Send + Sync,
     HC: 'static + ClientImpl + Send + Sync,
+    P: Provision + Clone + Send + Sync + 'static,
     M: MakeModuleRuntime,
     M::ModuleRuntime: Authenticator<Request = Request<Body>> + Send + Sync + Clone + 'static,
     <<M::ModuleRuntime as Authenticator>::AuthenticateFuture as Future>::Error: Fail,
@@ -1920,7 +1949,12 @@ where
     let label = "mgmt".to_string();
     let url = settings.listen().management_uri().clone();
 
-    ManagementService::new(runtime, id_man)
+//    let k = P::default();
+//    let man = ManualProvisioning::new(MemoryKey::new("".as_bytes()), "".to_string(), "".to_string());
+
+    let x = provision.unwrap();
+
+    ManagementService::new(runtime, id_man, x)
         .then(move |service| -> Result<_, Error> {
             let service = service.context(ErrorKind::Initialize(
                 InitializeErrorReason::ManagementService,

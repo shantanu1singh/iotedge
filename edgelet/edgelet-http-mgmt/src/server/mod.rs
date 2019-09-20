@@ -16,14 +16,17 @@ use edgelet_http::authorization::Authorization;
 use edgelet_http::route::*;
 use edgelet_http::router;
 use edgelet_http::Version;
+use provisioning::Provision;
 
 mod identity;
 mod module;
 mod system_info;
+mod device_actions;
 
 use self::identity::*;
 pub use self::module::*;
 use self::system_info::*;
+use self::device_actions::*;
 use crate::error::{Error, ErrorKind};
 
 lazy_static! {
@@ -36,7 +39,7 @@ pub struct ManagementService {
 }
 
 impl ManagementService {
-    pub fn new<M, I>(runtime: &M, identity: &I) -> impl Future<Item = Self, Error = Error>
+    pub fn new<M, I, P>(runtime: &M, identity: &I, provision: &P) -> impl Future<Item = Self, Error = Error>
     where
         M: ModuleRuntime + Authenticator<Request = Request<Body>> + Clone + Send + Sync + 'static,
         for<'r> &'r <M as ModuleRuntime>::Error: Into<ModuleRuntimeErrorReason>,
@@ -45,6 +48,7 @@ impl ManagementService {
         I: IdentityManager + Clone + Send + Sync + 'static,
         I::Identity: Serialize,
         <M::AuthenticateFuture as Future>::Error: Fail,
+        P: Provision + Clone + Send + Sync + 'static,
     {
         let router = router!(
             get     Version2018_06_28 runtime Policy::Anonymous             => "/modules"                           => ListModules::new(runtime.clone()),
@@ -64,6 +68,8 @@ impl ManagementService {
             delete  Version2018_06_28 runtime Policy::Module(&*AGENT_NAME)  => "/identities/(?P<name>[^/]+)"        => DeleteIdentity::new(identity.clone()),
 
             get     Version2018_06_28 runtime Policy::Anonymous             => "/systeminfo"                        => GetSystemInfo::new(runtime.clone()),
+
+            post    Version2019_01_30 runtime Policy::Module(&*AGENT_NAME)  => "/device/reprovision"                => ReprovisionDevice::new(provision.clone()),
         );
 
         router.new_service().then(|inner| {

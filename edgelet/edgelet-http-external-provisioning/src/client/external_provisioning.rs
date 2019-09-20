@@ -25,12 +25,15 @@ pub trait ExternalProvisioningInterface {
         > + Send;
 
     fn get_device_provisioning_information(&self) -> Self::DeviceProvisioningInformationFuture;
+
+    fn reprovision_device(&self) -> Self::DeviceProvisioningInformationFuture;
 }
 
-pub trait GetApi {
+pub trait GetApi: Send + Sync {
     fn get_api(&self) -> &dyn ExternalProvisioningApi;
 }
 
+#[derive(Clone)]
 pub struct ExternalProvisioningClient {
     client: Arc<dyn GetApi>,
 }
@@ -84,6 +87,20 @@ impl ExternalProvisioningInterface for ExternalProvisioningClient {
                 Error::from_external_provisioning_error(
                     err,
                     ErrorKind::GetDeviceProvisioningInformation,
+                )
+            });
+        Box::new(connection_info)
+    }
+
+    fn reprovision_device(&self) -> Self::DeviceProvisioningInformationFuture {
+        let connection_info = self
+            .client
+            .get_api()
+            .reprovision_device(crate::EXTERNAL_PROVISIONING_API_VERSION)
+            .map_err(|err| {
+                Error::from_external_provisioning_error(
+                    err,
+                    ErrorKind::ReprovisionDevice,
                 )
             });
         Box::new(connection_info)
@@ -151,6 +168,32 @@ mod tests {
                     Item = external_provisioning::models::DeviceProvisioningInfo,
                     Error = ExternalProvisioningError<serde_json::Value>,
                 > + Send,
+        > {
+            match self.error.as_ref() {
+                None => {
+                    let mut credentials =
+                        Credentials::new("symmetric-key".to_string(), "payload".to_string());
+                    credentials.set_key("test-key".to_string());
+                    let provisioning_info = DeviceProvisioningInfo::new(
+                        "TestHub".to_string(),
+                        "TestDevice".to_string(),
+                        credentials,
+                    );
+
+                    Box::new(Ok(provisioning_info).into_future())
+                }
+                Some(s) => Box::new(Err(ExternalProvisioningError::Api(s.clone().0)).into_future()),
+            }
+        }
+
+        fn reprovision_device(
+            &self,
+            _api_version: &str,
+        ) -> Box<
+            dyn Future<
+                Item = external_provisioning::models::DeviceProvisioningInfo,
+                Error = ExternalProvisioningError<serde_json::Value>,
+            > + Send,
         > {
             match self.error.as_ref() {
                 None => {

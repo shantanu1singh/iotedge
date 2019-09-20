@@ -184,9 +184,13 @@ pub trait Provision {
         self,
         key_activator: Self::Hsm,
     ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send>;
+
+    fn reprovision(
+        self,
+    ) -> Box<dyn Future<Item = (), Error = Error> + Send>;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ManualProvisioning {
     key: MemoryKey,
     device_id: String,
@@ -232,8 +236,15 @@ impl Provision for ManualProvisioning {
             .map_err(|err| Error::from(err.context(ErrorKind::Provision)));
         Box::new(result.into_future())
     }
+
+    fn reprovision(
+        self,
+    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        Box::new(future::ok(()))
+    }
 }
 
+#[derive(Clone)]
 pub struct ExternalProvisioning<T, U> {
     client: T,
 
@@ -404,6 +415,26 @@ where
 
         Box::new(result)
     }
+
+    fn reprovision(
+        self,
+    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        let result = self
+            .client
+            .reprovision_device()
+            .map_err(|err| Error::from(err.context(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::ReprovisioningFailure))))
+            .and_then(move |device_provisioning_info| {
+                info!(
+                    "External device registration information after reprovisioning: Device \"{}\" in hub \"{}\"",
+                    device_provisioning_info.device_id(),
+                    device_provisioning_info.hub_name()
+                );
+
+                Ok(())
+            });
+
+        Box::new(result)
+    }
 }
 
 pub struct DpsTpmProvisioning<C>
@@ -496,6 +527,12 @@ where
 
         Box::new(d)
     }
+
+    fn reprovision(
+        self,
+    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        Box::new(future::ok(()))
+    }
 }
 
 pub struct DpsSymmetricKeyProvisioning<C>
@@ -577,6 +614,12 @@ where
             Err(err) => Either::B(future::err(Error::from(err.context(ErrorKind::Provision)))),
         };
         Box::new(d)
+    }
+
+    fn reprovision(
+        self,
+    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        Box::new(future::ok(()))
     }
 }
 
@@ -661,6 +704,12 @@ where
             Err(err) => Either::B(future::err(Error::from(err.context(ErrorKind::Provision)))),
         };
         Box::new(d)
+    }
+
+    fn reprovision(
+        self,
+    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        Box::new(future::ok(()))
     }
 }
 
@@ -787,6 +836,12 @@ where
                     }
                 }),
         )
+    }
+
+    fn reprovision(
+        self,
+    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        Box::new(future::ok(()))
     }
 }
 

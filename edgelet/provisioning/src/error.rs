@@ -37,6 +37,7 @@ pub enum ExternalProvisioningErrorReason {
     InvalidSymmetricKey,
     KeyActivation,
     ProvisioningFailure,
+    ReprovisioningFailure,
     SymmetricKeyNotSpecified,
 }
 
@@ -70,6 +71,11 @@ impl fmt::Display for ExternalProvisioningErrorReason {
             ExternalProvisioningErrorReason::ProvisioningFailure => write!(
                 f,
                 "Error occurred while retrieving device provisioning information."
+            ),
+
+            ExternalProvisioningErrorReason::ReprovisioningFailure => write!(
+                f,
+                "Error occurred while reprovisioning the device."
             ),
 
             ExternalProvisioningErrorReason::SymmetricKeyNotSpecified => {
