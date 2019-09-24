@@ -42,7 +42,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
         readonly IList<X509Certificate2> trustBundle;
         readonly string proxy;
         readonly MetricsConfig metricsConfig;
-        readonly ExperimentalFeatures experimentalFeatures;
+        readonly bool useBackupAndRestore;
         readonly string storageBackupPath;
 
         public CommonModule(
@@ -64,7 +64,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
             IList<X509Certificate2> trustBundle,
             string proxy,
             MetricsConfig metricsConfig,
-            ExperimentalFeatures experimentalFeatures,
+            bool useBackupAndRestore,
             string storageBackupPath)
         {
             this.productInfo = productInfo;
@@ -85,7 +85,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
             this.trustBundle = Preconditions.CheckNotNull(trustBundle, nameof(trustBundle));
             this.proxy = Preconditions.CheckNotNull(proxy, nameof(proxy));
             this.metricsConfig = Preconditions.CheckNotNull(metricsConfig, nameof(metricsConfig));
-            this.experimentalFeatures = experimentalFeatures;
+            this.useBackupAndRestore = useBackupAndRestore;
             this.storageBackupPath = storageBackupPath;
         }
 
@@ -158,9 +158,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                                 IDbStoreProvider dbStoreprovider = DbStoreProvider.Create(
                                     c.Resolve<IRocksDbOptionsProvider>(),
                                     this.storagePath,
-                                    partitionsList,
-                                    Option.Some(this.storageBackupPath),
-                                    this.experimentalFeatures.EnableStorageBackupAndRestore);
+                                    partitionsList);
                                 logger.LogInformation($"Created persistent store at {this.storagePath}");
                                 return dbStoreprovider;
                             }
@@ -169,7 +167,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                                 logger.LogError(ex, "Error creating RocksDB store. Falling back to in-memory store.");
                                 return new InMemoryDbStoreProvider(
                                     Option.Some(this.storageBackupPath),
-                                    this.experimentalFeatures.EnableStorageBackupAndRestore);
+                                    this.useBackupAndRestore);
                             }
                         }
                         else
@@ -177,7 +175,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                             logger.LogInformation($"Using in-memory store");
                             return new InMemoryDbStoreProvider(
                                 Option.Some(this.storageBackupPath),
-                                this.experimentalFeatures.EnableStorageBackupAndRestore);
+                                this.useBackupAndRestore);
                         }
                     })
                 .As<IDbStoreProvider>()

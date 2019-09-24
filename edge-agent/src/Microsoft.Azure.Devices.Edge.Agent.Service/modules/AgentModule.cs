@@ -28,11 +28,11 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
         readonly Option<string> workloadApiVersion;
         readonly string moduleId;
         readonly Option<string> moduleGenerationId;
-        readonly ExperimentalFeatures experimentalFeatures;
+        readonly bool useBackupAndRestore;
         readonly string storageBackupPath;
 
-        public AgentModule(int maxRestartCount, TimeSpan intensiveCareTime, int coolOffTimeUnitInSeconds, bool usePersistentStorage, string storagePath, ExperimentalFeatures experimentalFeatures, string storageBackupPath)
-            : this(maxRestartCount, intensiveCareTime, coolOffTimeUnitInSeconds, usePersistentStorage, storagePath, Option.None<Uri>(), Option.None<string>(), Constants.EdgeAgentModuleIdentityName, Option.None<string>(), experimentalFeatures, storageBackupPath)
+        public AgentModule(int maxRestartCount, TimeSpan intensiveCareTime, int coolOffTimeUnitInSeconds, bool usePersistentStorage, string storagePath, bool useBackupAndRestore, string storageBackupPath)
+            : this(maxRestartCount, intensiveCareTime, coolOffTimeUnitInSeconds, usePersistentStorage, storagePath, Option.None<Uri>(), Option.None<string>(), Constants.EdgeAgentModuleIdentityName, Option.None<string>(), useBackupAndRestore, storageBackupPath)
         {
         }
 
@@ -46,7 +46,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
             Option<string> workloadApiVersion,
             string moduleId,
             Option<string> moduleGenerationId,
-            ExperimentalFeatures experimentalFeatures,
+            bool useBackupAndRestore,
             string storageBackupPath)
         {
             this.maxRestartCount = maxRestartCount;
@@ -58,7 +58,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
             this.workloadApiVersion = workloadApiVersion;
             this.moduleId = moduleId;
             this.moduleGenerationId = moduleGenerationId;
-            this.experimentalFeatures = experimentalFeatures;
+            this.useBackupAndRestore = useBackupAndRestore;
             this.storageBackupPath = storageBackupPath;
         }
 
@@ -156,9 +156,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
                                 IDbStoreProvider dbStoreprovider = DbStoreProvider.Create(
                                     c.Resolve<IRocksDbOptionsProvider>(),
                                     this.storagePath,
-                                    partitionsList,
-                                    Option.Some(this.storageBackupPath),
-                                    this.experimentalFeatures.EnableStorageBackupAndRestore);
+                                    partitionsList);
                                 logger.LogInformation($"Created persistent store at {this.storagePath}");
                                 return dbStoreprovider;
                             }
@@ -167,7 +165,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
                                 logger.LogError(ex, "Error creating RocksDB store. Falling back to in-memory store.");
                                 return new InMemoryDbStoreProvider(
                                     Option.Some(this.storageBackupPath),
-                                    this.experimentalFeatures.EnableStorageBackupAndRestore);
+                                    this.useBackupAndRestore);
                             }
                         }
                         else
@@ -175,7 +173,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
                             logger.LogInformation($"Using in-memory store");
                             return new InMemoryDbStoreProvider(
                                 Option.Some(this.storageBackupPath),
-                                this.experimentalFeatures.EnableStorageBackupAndRestore);
+                                this.useBackupAndRestore);
                         }
                     })
                 .As<IDbStoreProvider>()

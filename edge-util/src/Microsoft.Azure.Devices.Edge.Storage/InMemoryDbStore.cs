@@ -269,7 +269,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         static class Events
         {
-            const int IdStart = UtilEventsIds.InMemoryDbStore;
+            const int IdStart = UtilEventsIds.InMemoryDbStoreProvider;
             static readonly ILogger Log = Logger.Factory.CreateLogger<InMemoryDbStore>();
 
             enum EventIds

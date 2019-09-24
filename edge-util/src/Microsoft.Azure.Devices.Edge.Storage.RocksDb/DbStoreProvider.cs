@@ -30,11 +30,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
         public static DbStoreProvider Create(
             IRocksDbOptionsProvider optionsProvider,
             string path,
-            IEnumerable<string> partitionsList,
-            Option<string> storageBackupPath,
-            bool useBackupAndRestore)
+            IEnumerable<string> partitionsList)
         {
-            IRocksDb db = RocksDbWrapper.Create(optionsProvider, path, partitionsList, storageBackupPath, useBackupAndRestore);
+            IRocksDb db = RocksDbWrapper.Create(optionsProvider, path, partitionsList);
             IEnumerable<string> columnFamilies = db.ListColumnFamilies();
             IDictionary<string, IDbStore> entityDbStoreDictionary = new Dictionary<string, IDbStore>();
             foreach (string columnFamilyName in columnFamilies)
@@ -78,7 +76,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public void Close()
         {
-            this.db.Close();
+            // No-op.
         }
 
         public void Dispose()

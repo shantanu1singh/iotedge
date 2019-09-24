@@ -75,7 +75,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                 });
 
             bool optimizeForPerformance = this.configuration.GetValue("OptimizeForPerformance", true);
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) storeAndForward =
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, bool useBackupAndRestore, string storageBackupPath) storeAndForward =
                 this.GetStoreAndForwardConfiguration();
 
             IConfiguration configuration = this.configuration.GetSection("experimentalFeatures");
@@ -86,7 +86,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                 : new MetricsListenerConfig();
             MetricsConfig metricsConfig = new MetricsConfig(experimentalFeatures.Enabled, listenerConfig);
 
-            this.RegisterCommonModule(builder, optimizeForPerformance, storeAndForward, metricsConfig, experimentalFeatures);
+            this.RegisterCommonModule(builder, optimizeForPerformance, storeAndForward, metricsConfig);
             this.RegisterRoutingModule(builder, storeAndForward, experimentalFeatures);
             this.RegisterMqttModule(builder, storeAndForward, optimizeForPerformance);
             this.RegisterAmqpModule(builder);
@@ -105,7 +105,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             builder.RegisterModule(new AmqpModule(amqpSettings["scheme"], amqpSettings.GetValue<ushort>("port"), this.serverCertificate, this.iotHubHostname, clientCertAuthEnabled));
         }
 
-        void RegisterMqttModule(ContainerBuilder builder, (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) storeAndForward, bool optimizeForPerformance)
+        void RegisterMqttModule(ContainerBuilder builder, (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, bool useBackupAndRestore, string storageBackupPath) storeAndForward, bool optimizeForPerformance)
         {
             var topics = new MessageAddressConversionConfiguration(
                 this.configuration.GetSection(Constants.TopicNameConversionSectionName + ":InboundTemplates").Get<List<string>>(),
@@ -119,7 +119,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
 
         void RegisterRoutingModule(
             ContainerBuilder builder,
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) storeAndForward,
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, bool useBackupAndRestore, string storageBackupPath) storeAndForward,
             ExperimentalFeatures experimentalFeatures)
         {
             var routes = this.configuration.GetSection("routes").Get<Dictionary<string, string>>();
@@ -180,9 +180,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
         void RegisterCommonModule(
             ContainerBuilder builder,
             bool optimizeForPerformance,
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) storeAndForward,
-            MetricsConfig metricsConfig,
-            ExperimentalFeatures experimentalFeatures)
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, bool useBackupAndRestore, string storageBackupPath) storeAndForward,
+            MetricsConfig metricsConfig)
         {
             bool cacheTokens = this.configuration.GetValue("CacheTokens", false);
             Option<string> workloadUri = this.GetConfigurationValueIfExists<string>(Constants.ConfigKey.WorkloadUri);
@@ -221,7 +220,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                     this.trustBundle,
                     proxy,
                     metricsConfig,
-                    experimentalFeatures,
+                    storeAndForward.useBackupAndRestore,
                     storeAndForward.storageBackupPath));
         }
 
@@ -232,7 +231,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             return productInfo;
         }
 
-        (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, string storageBackupPath) GetStoreAndForwardConfiguration()
+        (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, bool useBackupAndRestore, string storageBackupPath) GetStoreAndForwardConfiguration()
         {
             int defaultTtl = -1;
             bool usePersistentStorage = this.configuration.GetValue<bool>("usePersistentStorage");
@@ -246,8 +245,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                 timeToLiveSecs = storeAndForwardConfigurationSection.GetValue("timeToLiveSecs", defaultTtl);
             }
 
+            bool useBackupAndRestore = !usePersistentStorage && this.configuration.GetValue<bool>("enableStorageBackupAndRestore");
             var storeAndForwardConfiguration = new StoreAndForwardConfiguration(timeToLiveSecs);
-            return (storeAndForwardEnabled, usePersistentStorage, storeAndForwardConfiguration, storagePath, storageBackupPath);
+            return (storeAndForwardEnabled, usePersistentStorage, storeAndForwardConfiguration, storagePath, useBackupAndRestore, storageBackupPath);
         }
 
         // Note: Keep in sync with iotedge-check's edge-hub-storage-mounted-from-host check (edgelet/iotedge/src/check/mod.rs)

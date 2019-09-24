@@ -31,7 +31,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Test
 
             Directory.CreateDirectory(this.rocksDbBackupFolder);
 
-            this.rocksDbStoreProvider = DbStoreProvider.Create(options, this.rocksDbFolder, new string[0], Option.Some(this.rocksDbBackupFolder), true);
+            this.rocksDbStoreProvider = DbStoreProvider.Create(options, this.rocksDbFolder, new string[0]);
         }
 
         public void Dispose()
@@ -50,6 +50,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Test
 
         public void RemoveDbStore(string partitionName) => throw new NotImplementedException();
 
-        public void Close() => this.rocksDbStoreProvider.Close();
+        public void Close()
+        {
+            // No-op.
+        }
     }
 }

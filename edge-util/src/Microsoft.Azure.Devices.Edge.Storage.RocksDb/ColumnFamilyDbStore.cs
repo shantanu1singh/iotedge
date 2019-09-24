@@ -134,15 +134,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             return this.IterateBatch(iterator => iterator.SeekToFirst(), batchSize, callback, cancellationToken);
         }
 
-        public Task BackupAsync(string backupPath)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void Close()
-        {
-            // No-op
-        }
+        public Task BackupAsync(string backupPath) => Task.CompletedTask;
 
         public void Dispose()
         {

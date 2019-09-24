@@ -108,11 +108,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public Iterator NewIterator(ColumnFamilyHandle handle) => this.db.NewIterator(handle);
 
-        public void Close()
-        {
-            // No-op
-        }
-
         public void Dispose()
         {
             if (!this.isDisposed.GetAndSet(true))

@@ -70,6 +70,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
             int coolOffTimeUnitInSeconds;
             bool usePersistentStorage;
             string storagePath;
+            bool enableStorageBackupAndRestore;
             string storageBackupPath;
             string edgeDeviceHostName;
             string dockerLoggingDriver;
@@ -87,6 +88,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
                 coolOffTimeUnitInSeconds = configuration.GetValue("CoolOffTimeUnitInSeconds", 10);
                 usePersistentStorage = configuration.GetValue("UsePersistentStorage", true);
                 storagePath = GetStoragePath(configuration);
+                enableStorageBackupAndRestore = configuration.GetValue("EnableStorageBackupAndRestore", false);
                 storageBackupPath = GetStorageBackupPath(configuration);
                 edgeDeviceHostName = configuration.GetValue<string>(Constants.EdgeDeviceHostNameKey);
                 dockerLoggingDriver = configuration.GetValue<string>("DockerLoggingDriver");
@@ -122,7 +124,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
                         IotHubConnectionStringBuilder connectionStringParser = IotHubConnectionStringBuilder.Create(deviceConnectionString);
                         deviceId = connectionStringParser.DeviceId;
                         iothubHostname = connectionStringParser.HostName;
-                        builder.RegisterModule(new AgentModule(maxRestartCount, intensiveCareTime, coolOffTimeUnitInSeconds, usePersistentStorage, storagePath, experimentalFeatures, storageBackupPath));
+                        builder.RegisterModule(new AgentModule(maxRestartCount, intensiveCareTime, coolOffTimeUnitInSeconds, usePersistentStorage, storagePath, enableStorageBackupAndRestore, storageBackupPath));
                         builder.RegisterModule(new DockerModule(deviceConnectionString, edgeDeviceHostName, dockerUri, dockerAuthConfig, upstreamProtocol, proxy, productInfo, closeOnIdleTimeout, idleTimeout));
                         break;
 
@@ -134,7 +136,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
                         string moduleId = configuration.GetValue(Constants.ModuleIdVariableName, Constants.EdgeAgentModuleIdentityName);
                         string moduleGenerationId = configuration.GetValue<string>(Constants.EdgeletModuleGenerationIdVariableName);
                         string apiVersion = configuration.GetValue<string>(Constants.EdgeletApiVersionVariableName);
-                        builder.RegisterModule(new AgentModule(maxRestartCount, intensiveCareTime, coolOffTimeUnitInSeconds, usePersistentStorage, storagePath, Option.Some(new Uri(workloadUri)), Option.Some(apiVersion), moduleId, Option.Some(moduleGenerationId), experimentalFeatures, storageBackupPath));
+                        builder.RegisterModule(new AgentModule(maxRestartCount, intensiveCareTime, coolOffTimeUnitInSeconds, usePersistentStorage, storagePath, Option.Some(new Uri(workloadUri)), Option.Some(apiVersion), moduleId, Option.Some(moduleGenerationId), enableStorageBackupAndRestore, storageBackupPath));
                         builder.RegisterModule(new EdgeletModule(iothubHostname, edgeDeviceHostName, deviceId, new Uri(managementUri), new Uri(workloadUri), apiVersion, dockerAuthConfig, upstreamProtocol, proxy, productInfo, closeOnIdleTimeout, idleTimeout));
                         break;
 
