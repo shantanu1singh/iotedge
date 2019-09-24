@@ -9,11 +9,12 @@ namespace Microsoft.Azure.Devices.Edge.Storage
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Extensions.Logging;
-    using ProtoBuf;
+    using Newtonsoft.Json;
+    using Newtonsoft.Json.Converters;
 
     public class InMemoryDbStoreProvider : IDbStoreProvider
     {
-        const string BackupMetadataFileName = "meta.bin";
+        const string BackupMetadataFileName = "meta.json";
         const string DefaultPartitionName = "$Default";
         readonly ConcurrentDictionary<string, IDbStore> partitionDbStoreDictionary = new ConcurrentDictionary<string, IDbStore>();
         readonly Option<string> backupPath;
@@ -51,20 +52,25 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
             try
             {
-                using (FileStream file = File.OpenRead(backupMetadataFilePath))
+                using (StreamReader file = File.OpenText(backupMetadataFilePath))
                 {
-                    BackupMetadataList backupMetadataList = Serializer.Deserialize<BackupMetadataList>(file);
+                    JsonSerializer serializer = new JsonSerializer();
+                    BackupMetadataList backupMetadataList = (BackupMetadataList)serializer.Deserialize(file, typeof(BackupMetadataList));
                     BackupMetadata backupMetadata = backupMetadataList.Backups[0];
-                    Events.BackupInformation(backupMetadata.Id, backupMetadata.TimestampUtc, backupMetadata.Stores);
+                    Events.BackupInformation(backupMetadata.Id, backupMetadata.SerializationFormat, backupMetadata.TimestampUtc, backupMetadata.Stores);
 
                     string latestBackupDirPath = Path.Combine(backupPath, backupMetadata.Id.ToString());
                     if (Directory.Exists(latestBackupDirPath))
                     {
+                        Events.RestoringFromBackup(backupMetadata.Id);
                         foreach (string store in backupMetadata.Stores)
                         {
                             InMemoryDbStore dbStore = new InMemoryDbStore(store, latestBackupDirPath);
                             this.partitionDbStoreDictionary.AddOrUpdate(store, dbStore, (_, __) => dbStore);
                         }
+
+                        Events.RestoreComplete();
+                        CleanupAllBackups(backupPath);
                     }
                     else
                     {
@@ -75,6 +81,12 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             catch (IOException exception)
             {
                 Events.RestoreFailure($"The restore operation failed with error ${exception}.");
+
+                // Clean up any restored state in the dictionary if the backup fails midway.
+                this.partitionDbStoreDictionary.Clear();
+
+                // Delete all backups as the last backup itself is corrupt.
+                CleanupAllBackups(backupPath);
             }
         }
 
@@ -107,6 +119,8 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 Guid backupId = Guid.NewGuid();
                 string dbBackupDirectory = Path.Combine(backupPathValue, backupId.ToString());
 
+                BackupMetadata newBackupMetadata = new BackupMetadata(backupId, SerializationFormat.ProtoBuf, DateTime.UtcNow, this.partitionDbStoreDictionary.Keys.ToList());
+                BackupMetadataList backupMetadataList = new BackupMetadataList(new List<BackupMetadata> { newBackupMetadata });
                 try
                 {
                     Directory.CreateDirectory(dbBackupDirectory);
@@ -115,20 +129,23 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                         await dbStore.BackupAsync(dbBackupDirectory);
                     }
 
-                    BackupMetadata newBackupMetadata = new BackupMetadata(backupId, DateTime.UtcNow, this.partitionDbStoreDictionary.Keys.ToList());
-                    BackupMetadataList backupMetadataList = new BackupMetadataList(new List<BackupMetadata> { newBackupMetadata });
-                    using (FileStream file = File.Create(Path.Combine(backupPathValue, BackupMetadataFileName)))
+                    using (StreamWriter file = File.CreateText(Path.Combine(backupPathValue, BackupMetadataFileName)))
                     {
-                        Serializer.Serialize(file, backupMetadataList);
+                        JsonSerializer serializer = new JsonSerializer();
+                        serializer.Serialize(file, backupMetadataList);
                     }
+
+                    Events.BackupComplete();
+
+                    // Clean any old backups.
+                    CleanupUnknownBackups(backupPathValue, backupMetadataList);
                 }
                 catch (IOException exception)
                 {
-                    Events.BackupFailure($"The backup operation failed with error ${exception}. Deleting left-over backup artifacts.");
-                    if (Directory.Exists(dbBackupDirectory))
-                    {
-                        File.Delete(dbBackupDirectory);
-                    }
+                    Events.BackupFailure($"The backup operation failed with error ${exception}.");
+
+                    // Clean up any artifacts of the attempted backup.
+                    CleanupKnownBackups(backupPathValue, backupMetadataList);
                 }
             }
         }
@@ -138,10 +155,55 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             // No-op
         }
 
-        [ProtoContract]
+        private static void CleanupAllBackups(string backupPath)
+        {
+            DirectoryInfo backupDirInfo = new DirectoryInfo(backupPath);
+            foreach (FileInfo file in backupDirInfo.GetFiles())
+            {
+                file.Delete();
+            }
+
+            foreach (DirectoryInfo dir in backupDirInfo.GetDirectories())
+            {
+                dir.Delete(true);
+            }
+
+            Events.AllBackupsDeleted();
+        }
+
+        private static void CleanupUnknownBackups(string backupPath, BackupMetadataList metadataList)
+        {
+            DirectoryInfo backupDirInfo = new DirectoryInfo(backupPath);
+            HashSet<string> knownBackupDirNames = new HashSet<string>(metadataList.Backups.Select(x => x.Id.ToString()), StringComparer.OrdinalIgnoreCase);
+            foreach (DirectoryInfo dir in backupDirInfo.GetDirectories())
+            {
+                if (!knownBackupDirNames.Contains(dir.Name))
+                {
+                    dir.Delete(true);
+                }
+            }
+
+            Events.UnknownBackupsDeleted();
+        }
+
+        private static void CleanupKnownBackups(string backupPath, BackupMetadataList metadataList)
+        {
+            DirectoryInfo backupDirInfo = new DirectoryInfo(backupPath);
+            HashSet<string> knownBackupDirNames = new HashSet<string>(metadataList.Backups.Select(x => x.Id.ToString()), StringComparer.OrdinalIgnoreCase);
+            foreach (DirectoryInfo dir in backupDirInfo.GetDirectories())
+            {
+                if (knownBackupDirNames.Contains(dir.Name))
+                {
+                    dir.Delete(true);
+                }
+            }
+
+            Events.BackupArtifactsCleanedUp();
+        }
+
         class BackupMetadataList
         {
-            private BackupMetadataList()
+            BackupMetadataList()
             {
             }
 
@@ -150,32 +212,36 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 this.Backups = backups;
             }
 
-            [ProtoMember(1)]
             public IList<BackupMetadata> Backups { get; }
         }
 
-        [ProtoContract]
         class BackupMetadata
         {
-            private BackupMetadata()
+            BackupMetadata()
             {
             }
 
-            public BackupMetadata(Guid id, DateTime timestampUtc, IList<string> stores)
+            public BackupMetadata(Guid id, SerializationFormat serializationFormat, DateTime timestampUtc, IList<string> stores)
             {
                 this.Id = id;
+                this.SerializationFormat = serializationFormat;
                 this.TimestampUtc = timestampUtc;
                 this.Stores = stores;
             }
 
-            [ProtoMember(1)]
             public Guid Id { get; }
 
-            [ProtoMember(2)]
-            public DateTime TimestampUtc { get; set; }
+            [JsonConverter(typeof(StringEnumConverter))]
+            public SerializationFormat SerializationFormat { get; set; }
 
-            [ProtoMember(3)]
             public IList<string> Stores { get; set; }
+
+            public DateTime TimestampUtc { get; set; }
+        }
+
+        enum SerializationFormat
+        {
+            ProtoBuf = 0,
         }
 
         static class Events
@@ -186,6 +252,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             enum EventIds
             {
                 StartingBackup = IdStart,
+                AllBackupsDeleted,
+                UnknownBackupsDeleted,
+                BackupArtifactsCleanedUp,
                 BackupComplete,
                 BackupDirectoryNotFound,
                 BackupInformation,
@@ -211,9 +280,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 Log.LogInformation((int)EventIds.BackupDirectoryNotFound, $"The database backup directory {backupDirectoryPath} doesn't exist.");
             }
 
-            internal static void BackupInformation(Guid backupId, DateTime backupTimestamp, IList<string> stores)
+            internal static void BackupInformation(Guid backupId, SerializationFormat format, DateTime backupTimestamp, IList<string> stores)
             {
-                Log.LogDebug((int)EventIds.BackupInformation, $"Backup Info: Timestamp={backupTimestamp}, ID={backupId}. Stores={string.Join(",", stores)}");
+                Log.LogDebug((int)EventIds.BackupInformation, $"Backup Info: Timestamp={backupTimestamp}, ID={backupId}, Serialization Format={format}, Stores={string.Join(",", stores)}");
             }
 
             internal static void BackupFailure(string details = null)
@@ -221,9 +290,24 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                 Log.LogError((int)EventIds.BackupFailure, $"Error occurred while attempting to create a database backup. Details: {details}.");
             }
 
-            internal static void RestoringFromBackup()
+            internal static void AllBackupsDeleted()
             {
-                Log.LogInformation((int)EventIds.RestoringFromBackup, "Starting restore of database from last backup.");
+                Log.LogInformation((int)EventIds.AllBackupsDeleted, "All existing backups have been deleted.");
+            }
+
+            internal static void UnknownBackupsDeleted()
+            {
+                Log.LogInformation((int)EventIds.UnknownBackupsDeleted, "All unknown backups have been cleaned up.");
+            }
+
+            internal static void BackupArtifactsCleanedUp()
+            {
+                Log.LogInformation((int)EventIds.BackupArtifactsCleanedUp, "Cleaned up the current backup's artifacts.");
+            }
+
+            internal static void RestoringFromBackup(Guid backupId)
+            {
+                Log.LogInformation((int)EventIds.RestoringFromBackup, $"Starting restore of database from backup {backupId}.");
             }
 
             internal static void NoBackupsForRestore()

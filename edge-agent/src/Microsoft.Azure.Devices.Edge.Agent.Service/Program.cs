@@ -87,7 +87,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
                 coolOffTimeUnitInSeconds = configuration.GetValue("CoolOffTimeUnitInSeconds", 10);
                 usePersistentStorage = configuration.GetValue("UsePersistentStorage", true);
                 storagePath = GetStoragePath(configuration);
-                storageBackupPath = GetStorageBackupPath(configuration, storagePath);
+                storageBackupPath = GetStorageBackupPath(configuration);
                 edgeDeviceHostName = configuration.GetValue<string>(Constants.EdgeDeviceHostNameKey);
                 dockerLoggingDriver = configuration.GetValue<string>("DockerLoggingDriver");
                 dockerLoggingOptions = configuration.GetSection("DockerLoggingOptions").Get<Dictionary<string, string>>() ?? new Dictionary<string, string>();
@@ -283,12 +283,12 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
             return storagePath;
         }
 
-        static string GetStorageBackupPath(IConfiguration configuration, string storageFolderPath)
+        static string GetStorageBackupPath(IConfiguration configuration)
         {
             string baseBackupStoragePath = configuration.GetValue<string>("BackupFolder");
             if (string.IsNullOrWhiteSpace(baseBackupStoragePath) || !Directory.Exists(baseBackupStoragePath))
             {
-                baseBackupStoragePath = storageFolderPath;
+                baseBackupStoragePath = Path.GetTempPath();
             }
 
             string backupStoragePath = Path.Combine(baseBackupStoragePath, EdgeAgentStorageBackupFolder);

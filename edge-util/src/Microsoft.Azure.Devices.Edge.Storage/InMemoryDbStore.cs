@@ -8,6 +8,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using System.Web;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Extensions.Logging;
     using Nito.AsyncEx;
@@ -18,53 +19,34 @@ namespace Microsoft.Azure.Devices.Edge.Storage
     /// </summary>
     class InMemoryDbStore : IDbStore
     {
-        private const string BackupMetadataFileName = "meta.bin";
         readonly ItemKeyedCollection keyValues;
         readonly AsyncReaderWriterLock listLock = new AsyncReaderWriterLock();
         readonly string dbName;
-        readonly Option<string> backupPath;
-        readonly bool useBackupAndRestore;
 
         public InMemoryDbStore(string dbName)
         {
             Preconditions.CheckNonWhiteSpace(dbName, nameof(dbName));
             this.dbName = dbName;
-            this.useBackupAndRestore = false;
-            this.backupPath = Option.None<string>();
             this.keyValues = new ItemKeyedCollection(new ByteArrayComparer());
-
-            // Restore from a previous backup if enabled.
-            if (this.useBackupAndRestore)
-            {
-                string backupPathValue = this.backupPath.Expect(() => new ArgumentException($"The value of {nameof(backupPath)} needs to be specified if backup and restore is enabled."));
-                Preconditions.CheckNonWhiteSpace(backupPathValue, nameof(backupPath));
-
-                this.RestoreDb(dbName, backupPathValue);
-            }
         }
 
         public InMemoryDbStore(string dbName, string backupPath)
         {
             Preconditions.CheckNonWhiteSpace(dbName, nameof(dbName));
+            Preconditions.CheckNonWhiteSpace(backupPath, nameof(backupPath));
             this.dbName = dbName;
-            this.useBackupAndRestore = false;
-            this.backupPath = Option.None<string>();
             this.keyValues = new ItemKeyedCollection(new ByteArrayComparer());
 
-            Preconditions.CheckNonWhiteSpace(backupPath, nameof(backupPath));
             this.RestoreDb(dbName, backupPath);
         }
 
         private void RestoreDb(string dbName, string backupPath)
         {
-            Events.RestoringFromBackup(dbName);
-            string backupFileName = Hash.CreateSha1AsHex(dbName);
-            Events.RestoringFromBackup(backupFileName);
+            string backupFileName = HttpUtility.UrlEncode(dbName);
             string dbBackupPath = Path.Combine(backupPath, $"{backupFileName}.bin");
             if (!File.Exists(dbBackupPath))
             {
-                Events.NoBackupsForRestore();
-                return;
+                throw new IOException($"The backup data for database {dbName} doesn't exist.");
             }
 
             try
@@ -80,7 +62,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
             catch (IOException exception)
             {
-                Events.RestoreFailure($"The restore operation failed with error ${exception}.");
+                throw new IOException($"The restore operation for database {dbName} failed with error.", exception);
             }
         }
 
@@ -181,21 +163,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
         }
 
-        public void Close()
-        {
-            //this.CloseAsync().Wait();
-        }
-
         public async Task BackupAsync(string backupPath)
         {
-            Events.StartingBackup();
-            await this.CloseAsync(backupPath);
-        }
-
-        public async Task CloseAsync(string backupPath)
-        {
-            Events.StartingBackup(this.dbName);
-            string backupFileName = Hash.CreateSha1AsHex(this.dbName);
+            string backupFileName = HttpUtility.UrlEncode(this.dbName);
             string newBackupPath = Path.Combine(backupPath, $"{backupFileName}.bin");
             try
             {
@@ -209,11 +179,13 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
             catch (IOException exception)
             {
-                Events.BackupFailure($"The backup operation failed with error ${exception}. Deleting left-over backup artifacts.");
+                // Delete the backup data if anything was created as it will likely be corrupt.
                 if (File.Exists(newBackupPath))
                 {
                     File.Delete(newBackupPath);
                 }
+
+                throw new IOException($"The backup operation for database {this.dbName} failed with error.", exception);
             }
         }
 
@@ -257,22 +229,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
                 return hashCode;
             }
-        }
-
-        [ProtoContract]
-        class BackupMetadata
-        {
-            public BackupMetadata(Guid latestBackupId, DateTime latestBackupTimestampUtc)
-            {
-                this.LatestBackupId = latestBackupId;
-                this.LatestBackupTimestampUtc = latestBackupTimestampUtc;
-            }
-
-            [ProtoMember(1)]
-            public Guid LatestBackupId { get; }
-
-            [ProtoMember(2)]
-            public DateTime LatestBackupTimestampUtc { get; set; }
         }
 
         [ProtoContract]

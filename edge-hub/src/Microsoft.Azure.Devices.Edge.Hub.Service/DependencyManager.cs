@@ -238,7 +238,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             bool usePersistentStorage = this.configuration.GetValue<bool>("usePersistentStorage");
             int timeToLiveSecs = defaultTtl;
             string storagePath = this.GetStoragePath();
-            string storageBackupPath = this.GetStorageBackupPath(storagePath);
+            string storageBackupPath = this.GetStorageBackupPath();
             bool storeAndForwardEnabled = this.configuration.GetValue<bool>("storeAndForwardEnabled");
             if (storeAndForwardEnabled)
             {
@@ -264,12 +264,12 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             return storagePath;
         }
 
-        string GetStorageBackupPath(string storageFolderPath)
+        string GetStorageBackupPath()
         {
             string baseBackupStoragePath = this.configuration.GetValue<string>("backupFolder");
             if (string.IsNullOrWhiteSpace(baseBackupStoragePath) || !Directory.Exists(baseBackupStoragePath))
             {
-                baseBackupStoragePath = storageFolderPath;
+                baseBackupStoragePath = Path.GetTempPath();
             }
 
             string backupStoragePath = Path.Combine(baseBackupStoragePath, Constants.EdgeHubStorageBackupFolder);
