@@ -8,7 +8,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Test
     public class TestRocksDbStoreProvider : IDbStoreProvider
     {
         readonly string rocksDbFolder;
-        readonly string rocksDbBackupFolder;
         readonly DbStoreProvider rocksDbStoreProvider;
 
         public TestRocksDbStoreProvider()
@@ -22,15 +21,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Test
             }
 
             Directory.CreateDirectory(this.rocksDbFolder);
-
-            this.rocksDbBackupFolder = Path.Combine(tempFolder, $"edgeTestBackupDb{Guid.NewGuid()}");
-            if (Directory.Exists(this.rocksDbBackupFolder))
-            {
-                Directory.Delete(this.rocksDbBackupFolder);
-            }
-
-            Directory.CreateDirectory(this.rocksDbBackupFolder);
-
             this.rocksDbStoreProvider = DbStoreProvider.Create(options, this.rocksDbFolder, new string[0]);
         }
 
