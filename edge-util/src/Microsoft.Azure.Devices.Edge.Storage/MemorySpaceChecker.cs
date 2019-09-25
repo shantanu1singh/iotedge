@@ -2,10 +2,7 @@
 namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
 {
     using System;
-    using System.IO;
-    using System.Linq;
     using System.Threading.Tasks;
-    using Microsoft.Azure.Devices.Edge.Storage.Disk;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Extensions.Logging;
 
@@ -60,7 +57,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
             }
             catch (Exception e)
             {
-                Events.Log.LogWarning(e, $"Error updating memory usage status.");
+                Events.Log.LogWarning(e, "Error updating memory usage status.");
             }
         }
 
@@ -100,7 +97,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb.Disk
         static class Events
         {
             public static readonly ILogger Log = Logger.Factory.CreateLogger<MemorySpaceChecker>();
-            const int IdStart = 50000;
+            const int IdStart = UtilEventsIds.MemorySpaceChecker;
 
             enum EventIds
             {

@@ -2,7 +2,7 @@
 using System;
 using System.Threading.Tasks;
 
-namespace Microsoft.Azure.Devices.Edge.Storage.Disk
+namespace Microsoft.Azure.Devices.Edge.Storage
 {
     public class NullStorageSpaceChecker : IStorageSpaceChecker
     {

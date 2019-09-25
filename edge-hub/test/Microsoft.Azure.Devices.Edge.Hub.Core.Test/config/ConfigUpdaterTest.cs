@@ -7,7 +7,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Config.Test
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Hub.Core.Config;
     using Microsoft.Azure.Devices.Edge.Hub.Core.Routing;
-    using Microsoft.Azure.Devices.Edge.Storage.Disk;
+    using Microsoft.Azure.Devices.Edge.Storage;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Azure.Devices.Edge.Util.Test.Common;
     using Microsoft.Azure.Devices.Routing.Core;

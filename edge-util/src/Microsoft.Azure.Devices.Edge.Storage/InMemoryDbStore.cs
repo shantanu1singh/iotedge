@@ -160,7 +160,6 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
         }
 
-
         class ByteArrayComparer : IEqualityComparer<byte[]>
         {
             public bool Equals(byte[] x, byte[] y) => (x == null && y == null) || x.SequenceEqual(y);

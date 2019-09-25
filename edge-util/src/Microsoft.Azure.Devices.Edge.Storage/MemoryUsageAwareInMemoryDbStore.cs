@@ -3,11 +3,10 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 {
     using System.Threading;
     using System.Threading.Tasks;
-    using Microsoft.Azure.Devices.Edge.Storage.Disk;
     using Microsoft.Azure.Devices.Edge.Util;
 
     /// <summary>
-    /// Provides an in memory implementation of the IDbStore
+    /// Provides an in memory implementation of the IDbStore that is aware of memory usage limits.
     /// </summary>
     class MemoryUsageAwareInMemoryDbStore : InMemoryDbStore
     {

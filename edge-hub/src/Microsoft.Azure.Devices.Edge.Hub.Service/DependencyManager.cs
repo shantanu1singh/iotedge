@@ -75,7 +75,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                 });
 
             bool optimizeForPerformance = this.configuration.GetValue("OptimizeForPerformance", true);
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) storeAndForward = this.GetStoreAndForwardConfiguration();
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, int storageSpaceCheckFrequency) storeAndForward = this.GetStoreAndForwardConfiguration();
 
             IConfiguration configuration = this.configuration.GetSection("experimentalFeatures");
             ExperimentalFeatures experimentalFeatures = ExperimentalFeatures.Create(configuration);
@@ -85,7 +85,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                 : new MetricsListenerConfig();
             MetricsConfig metricsConfig = new MetricsConfig(experimentalFeatures.Enabled, listenerConfig);
 
-            this.RegisterCommonModule(builder, optimizeForPerformance, storeAndForward, experimentalFeatures, metricsConfig);
+            this.RegisterCommonModule(builder, optimizeForPerformance, storeAndForward, metricsConfig);
             this.RegisterRoutingModule(builder, storeAndForward, experimentalFeatures);
             this.RegisterMqttModule(builder, storeAndForward, optimizeForPerformance);
             this.RegisterAmqpModule(builder);
@@ -104,7 +104,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             builder.RegisterModule(new AmqpModule(amqpSettings["scheme"], amqpSettings.GetValue<ushort>("port"), this.serverCertificate, this.iotHubHostname, clientCertAuthEnabled));
         }
 
-        void RegisterMqttModule(ContainerBuilder builder, (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) storeAndForward, bool optimizeForPerformance)
+        void RegisterMqttModule(ContainerBuilder builder, (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, int storageSpaceCheckFrequency) storeAndForward, bool optimizeForPerformance)
         {
             var topics = new MessageAddressConversionConfiguration(
                 this.configuration.GetSection(Constants.TopicNameConversionSectionName + ":InboundTemplates").Get<List<string>>(),
@@ -118,7 +118,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
 
         void RegisterRoutingModule(
             ContainerBuilder builder,
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) storeAndForward,
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, int storageSpaceCheckFrequency) storeAndForward,
             ExperimentalFeatures experimentalFeatures)
         {
             var routes = this.configuration.GetSection("routes").Get<Dictionary<string, string>>();
@@ -179,8 +179,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
         void RegisterCommonModule(
             ContainerBuilder builder,
             bool optimizeForPerformance,
-            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) storeAndForward,
-            ExperimentalFeatures experimentalFeatures,
+            (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, int storageSpaceCheckFrequency) storeAndForward,
             MetricsConfig metricsConfig)
         {
             bool cacheTokens = this.configuration.GetValue("CacheTokens", false);
@@ -198,8 +197,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
 
             string proxy = this.configuration.GetValue("https_proxy", string.Empty);
             string productInfo = GetProductInfo();
-            long rocksDbCompactionPeriodSecs = this.configuration.GetValue("RocksDbCompactionPeriodSecs", 7200);
-            TimeSpan rocksDbCompactionPeriod = TimeSpan.FromSeconds(rocksDbCompactionPeriodSecs);
 
             // Register modules
             builder.RegisterModule(
@@ -222,8 +219,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                     this.trustBundle,
                     proxy,
                     metricsConfig,
-                    experimentalFeatures,
-                    rocksDbCompactionPeriod));
+                    storeAndForward.config.MaxStorageSpaceBytes,
+                    storeAndForward.storageSpaceCheckFrequency));
         }
 
         static string GetProductInfo()
@@ -233,7 +230,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             return productInfo;
         }
 
-        (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath) GetStoreAndForwardConfiguration()
+        (bool isEnabled, bool usePersistentStorage, StoreAndForwardConfiguration config, string storagePath, int storageSpaceCheckFrequency) GetStoreAndForwardConfiguration()
         {
             int defaultTtl = -1;
             bool usePersistentStorage = this.configuration.GetValue<bool>("usePersistentStorage");
@@ -247,7 +244,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             }
 
             var storeAndForwardConfiguration = new StoreAndForwardConfiguration(timeToLiveSecs);
-            return (storeAndForwardEnabled, usePersistentStorage, storeAndForwardConfiguration, storagePath);
+
+            int storageSpaceCheckFrequency = this.configuration.GetValue<int>("storageSpaceCheckFrequencySecs", Constants.StorageSpaceCheckFrequencyInSecs);
+            return (storeAndForwardEnabled, usePersistentStorage, storeAndForwardConfiguration, storagePath, storageSpaceCheckFrequency);
         }
 
         // Note: Keep in sync with iotedge-check's edge-hub-storage-mounted-from-host check (edgelet/iotedge/src/check/mod.rs)

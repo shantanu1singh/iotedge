@@ -3,15 +3,13 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 {
     using System.Collections.Concurrent;
     using System.Threading.Tasks;
-    using Microsoft.Azure.Devices.Edge.Storage.Disk;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Extensions.Logging;
 
     public class InMemoryDbStoreProvider : IDbStoreProvider
     {
-        static readonly ILogger Log = Logger.Factory.CreateLogger<InMemoryDbStoreProvider>();
-
         const string DefaultPartitionName = "$Default";
+        static readonly ILogger Log = Logger.Factory.CreateLogger<InMemoryDbStoreProvider>();
         readonly ConcurrentDictionary<string, InMemoryDbStore> partitionDbStoreDictionary = new ConcurrentDictionary<string, InMemoryDbStore>();
         readonly Option<IStorageSpaceChecker> memoryStorageSpaceChecker;
 
@@ -27,7 +25,8 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             {
                 this.memoryStorageSpaceChecker = this.memoryStorageSpaceChecker.Map(
                     m => {
-                        m.SetStorageUsageComputer(GetTotalMemoryUsage); return m;
+                        m.SetStorageUsageComputer(GetTotalMemoryUsage);
+                        return m;
                     });
             }
         }
