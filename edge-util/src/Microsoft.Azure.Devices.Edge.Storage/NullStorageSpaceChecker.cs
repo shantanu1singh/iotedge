@@ -1,9 +1,9 @@
 // Copyright (c) Microsoft. All rights reserved.
-using System;
-using System.Threading.Tasks;
-
 namespace Microsoft.Azure.Devices.Edge.Storage
 {
+    using System;
+    using System.Threading.Tasks;
+
     public class NullStorageSpaceChecker : IStorageSpaceChecker
     {
         public void SetMaxStorageSize(long maxStorageBytes)
