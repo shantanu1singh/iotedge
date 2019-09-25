@@ -70,13 +70,14 @@ namespace Microsoft.Azure.Devices.Edge.Storage
                         }
 
                         Events.RestoreComplete();
-                        CleanupAllBackups(backupPath);
                     }
                     else
                     {
                         Events.NoBackupsForRestore();
                     }
                 }
+
+                CleanupAllBackups(backupPath);
             }
             catch (IOException exception)
             {

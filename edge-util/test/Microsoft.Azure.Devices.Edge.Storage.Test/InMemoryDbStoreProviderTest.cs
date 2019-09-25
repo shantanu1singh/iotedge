@@ -115,25 +115,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage.Test
                 await store.Put("key3".ToBytes(), "val3".ToBytes());
             }
 
-            Func<IDbStore, Task> dbValidator = async (IDbStore dbStore) =>
-            {
-                Option<(byte[] key, byte[] value)> firstValueOption = await dbStore.GetFirstEntry();
-                Assert.True(firstValueOption.HasValue);
-                (byte[] key, byte[] value) firstValue = firstValueOption.OrDefault();
-                Assert.Equal("key1", firstValue.key.FromBytes<string>());
-                Assert.Equal("val1", firstValue.value.FromBytes<string>());
-
-                Option<(byte[] key, byte[] value)> lastValueOption = await dbStore.GetLastEntry();
-                Assert.True(lastValueOption.HasValue);
-                (byte[] key, byte[] value) lastValue = lastValueOption.OrDefault();
-                Assert.Equal("key3", lastValue.key.FromBytes<string>());
-                Assert.Equal("val3", lastValue.value.FromBytes<string>());
-            };
-
-            foreach (IDbStore store in stores)
-            {
-                await dbValidator(store);
-            }
+            // Force the creation of a backup.
+            provider.Close();
+            ValidateBackupArtifacts(this.backupFolder);
 
             // Corrupt the backup data.
             DirectoryInfo backupFolderInfo = new DirectoryInfo(this.backupFolder);
