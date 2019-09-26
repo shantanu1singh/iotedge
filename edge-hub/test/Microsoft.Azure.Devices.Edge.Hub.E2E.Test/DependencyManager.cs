@@ -121,9 +121,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
                     false,
                     this.trustBundle,
                     string.Empty,
-                    metricsConfig,
-                    false,
-                    string.Empty));
+                    metricsConfig));
 
             builder.RegisterModule(
                 new RoutingModule(
