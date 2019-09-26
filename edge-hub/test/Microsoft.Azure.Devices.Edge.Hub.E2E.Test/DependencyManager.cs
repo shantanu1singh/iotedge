@@ -102,6 +102,16 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
             var storeAndForwardConfiguration = new StoreAndForwardConfiguration(-1);
             var metricsConfig = new MetricsConfig(true, new MetricsListenerConfig());
 
+            if (!bool.TryParse(this.configuration["UsePersistentStorage"], out bool usePersistentStorage))
+            {
+                usePersistentStorage = true;
+            }
+
+            if (!bool.TryParse(this.configuration["EnableStorageBackupAndRestore"], out bool enableStorageBackupAndRestore))
+            {
+                enableStorageBackupAndRestore = false;
+            }
+
             builder.RegisterModule(
                 new CommonModule(
                     string.Empty,
@@ -113,7 +123,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
                     AuthenticationMode.CloudAndScope,
                     Option.Some(edgeHubConnectionString),
                     false,
-                    false,
+                    usePersistentStorage,
                     string.Empty,
                     Option.None<string>(),
                     Option.None<string>(),
@@ -122,8 +132,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
                     this.trustBundle,
                     string.Empty,
                     metricsConfig,
-                    false,
-                    string.Empty));
+                    enableStorageBackupAndRestore,
+                    this.configuration["BackupFolder"]));
 
             builder.RegisterModule(
                 new RoutingModule(

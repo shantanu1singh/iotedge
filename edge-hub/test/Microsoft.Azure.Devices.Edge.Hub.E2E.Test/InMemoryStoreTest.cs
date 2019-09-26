@@ -18,6 +18,19 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
 
         public InMemoryStoreTest()
         {
+            string tempFolder = Path.GetTempPath();
+            string backupFolder = Path.Combine(tempFolder, $"edgeTestBackup{Guid.NewGuid()}");
+            if (Directory.Exists(backupFolder))
+            {
+                Directory.Delete(backupFolder);
+            }
+
+            Directory.CreateDirectory(backupFolder);
+
+            ConfigHelper.TestConfig["UsePersistentStorage"] = "false";
+            ConfigHelper.TestConfig["BackupFolder"] = backupFolder;
+            ConfigHelper.TestConfig["EnableStorageBackupAndRestore"] = "true";
+
             this.protocolHeadFixture = new ProtocolHeadFixture();
         }
 
@@ -38,18 +51,18 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
             IotHubConnectionStringBuilder connectionStringBuilder = IotHubConnectionStringBuilder.Create(edgeDeviceConnectionString);
             RegistryManager rm = RegistryManager.CreateFromConnectionString(edgeDeviceConnectionString);
 
-            string tempFolder = Path.GetTempPath();
-            string backupFolder = Path.Combine(tempFolder, $"edgeTestBackup{Guid.NewGuid()}");
-            if (Directory.Exists(backupFolder))
-            {
-                Directory.Delete(backupFolder);
-            }
+            //string tempFolder = Path.GetTempPath();
+            //string backupFolder = Path.Combine(tempFolder, $"edgeTestBackup{Guid.NewGuid()}");
+            //if (Directory.Exists(backupFolder))
+            //{
+            //    Directory.Delete(backupFolder);
+            //}
 
-            Directory.CreateDirectory(backupFolder);
+            //Directory.CreateDirectory(backupFolder);
 
-            Environment.SetEnvironmentVariable("UsePersistentStorage", "false");
-            Environment.SetEnvironmentVariable("BackupFolder", backupFolder);
-            Environment.SetEnvironmentVariable("EnableStorageBackupAndRestore", "true");
+            //Environment.SetEnvironmentVariable("UsePersistentStorage", "false");
+            //Environment.SetEnvironmentVariable("BackupFolder", backupFolder);
+            //Environment.SetEnvironmentVariable("EnableStorageBackupAndRestore", "true");
 
             try
             {
@@ -81,9 +94,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
             }
             finally
             {
-                Environment.SetEnvironmentVariable("UsePersistentStorage", null);
-                Environment.SetEnvironmentVariable("BackupFolder", null);
-                Environment.SetEnvironmentVariable("EnableStorageBackupAndRestore", null);
+                ConfigHelper.TestConfig["UsePersistentStorage"] = null;
+                ConfigHelper.TestConfig["BackupFolder"] = null;
+                ConfigHelper.TestConfig["EnableStorageBackupAndRestore"] = null;
 
                 if (rm != null)
                 {

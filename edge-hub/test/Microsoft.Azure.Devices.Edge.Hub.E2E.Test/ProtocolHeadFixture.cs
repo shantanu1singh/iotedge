@@ -38,7 +38,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
 
         public void Dispose()
         {
-            this.internalFixture.Dispose();
+            this.internalFixture?.Dispose();
             this.ProtocolHead = null;
             this.internalFixture = null;
         }
@@ -133,7 +133,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.E2E.Test
                     dbStoreProvider.Dispose();
 
                     this.hosting.Container.Dispose();
-                    this.hosting.WebHost.Dispose();
+                    //this.hosting.WebHost.Dispose();
                 }
             }
         }
