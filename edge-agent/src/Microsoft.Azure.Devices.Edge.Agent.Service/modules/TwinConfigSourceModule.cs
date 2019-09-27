@@ -12,6 +12,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
     using Microsoft.Azure.Devices.Edge.Agent.Core.Requests;
     using Microsoft.Azure.Devices.Edge.Agent.Core.Serde;
     using Microsoft.Azure.Devices.Edge.Agent.Docker;
+    using Microsoft.Azure.Devices.Edge.Agent.Edgelet;
     using Microsoft.Azure.Devices.Edge.Agent.IoTHub;
     using Microsoft.Azure.Devices.Edge.Agent.IoTHub.Blob;
     using Microsoft.Azure.Devices.Edge.Agent.IoTHub.ConfigSources;
@@ -148,8 +149,9 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
                     var serde = c.Resolve<ISerde<DeploymentConfig>>();
                     var deviceClientprovider = c.Resolve<IModuleClientProvider>();
                     var requestManager = c.Resolve<IRequestManager>();
+                    var deviceManager = c.Resolve<IDeviceManager>();
                     bool enableSubscriptions = !this.experimentalFeatures.DisableCloudSubscriptions;
-                    IEdgeAgentConnection edgeAgentConnection = new EdgeAgentConnection(deviceClientprovider, serde, requestManager, enableSubscriptions, this.configRefreshFrequency);
+                    IEdgeAgentConnection edgeAgentConnection = new EdgeAgentConnection(deviceClientprovider, serde, requestManager, deviceManager, enableSubscriptions, this.configRefreshFrequency);
                     return edgeAgentConnection;
                 })
                 .As<IEdgeAgentConnection>()

@@ -12,7 +12,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Azure.Devices.Edge.Util.Edged;
 
-    public class ModuleManagementHttpClient : IModuleManager, IIdentityManager
+    public class ModuleManagementHttpClient : IModuleManager, IIdentityManager, IDeviceManager
     {
         readonly ModuleManagementHttpClientVersioned inner;
 
@@ -51,6 +51,8 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet
         public Task<IEnumerable<ModuleRuntimeInfo>> GetModules<T>(CancellationToken token) => this.inner.GetModules<T>(token);
 
         public Task PrepareUpdateAsync(ModuleSpec moduleSpec) => this.inner.PrepareUpdateAsync(moduleSpec);
+
+        public Task ReprovisionDeviceAsync() => this.inner.ReprovisionDeviceAsync();
 
         public Task<Stream> GetModuleLogs(string name, bool follow, Option<int> tail, Option<int> since, CancellationToken cancellationToken) =>
             this.inner.GetModuleLogs(name, follow, tail, since, cancellationToken);

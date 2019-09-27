@@ -84,6 +84,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
             builder.Register(c => new ModuleManagementHttpClient(this.managementUri, this.apiVersion, Constants.EdgeletClientApiVersion))
                 .As<IModuleManager>()
                 .As<IIdentityManager>()
+                .As<IDeviceManager>()
                 .SingleInstance();
 
             // IModuleIdentityLifecycleManager
