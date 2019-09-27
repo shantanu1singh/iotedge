@@ -1768,7 +1768,7 @@ fn dps_tpm_provision<HC>(
     tokio_runtime: &mut tokio::runtime::Runtime,
     tpm_attestation_info: &TpmAttestationInfo,
     hsm_lock: Arc<HsmLock>,
-) -> Result<(DerivedKeyStore<TpmKey>, ProvisioningResult, TpmKey), Error>
+) -> Result<(DerivedKeyStore<TpmKey>, ProvisioningResult, TpmKey, DpsTpmProvisioning<HC>), Error>
 where
     HC: 'static + ClientImpl,
 {
@@ -1826,7 +1826,7 @@ where
                     InitializeErrorReason::DpsProvisioningClient,
                 ))?;
             let derived_key_store = DerivedKeyStore::new(k.clone());
-            Ok((derived_key_store, prov_result, k))
+            Ok((derived_key_store, prov_result, k, dps))
         });
 
     tokio_runtime.block_on(provision)
