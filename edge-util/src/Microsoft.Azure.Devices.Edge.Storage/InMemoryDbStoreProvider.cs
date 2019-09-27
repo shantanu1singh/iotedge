@@ -24,8 +24,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             if (this.memoryStorageSpaceChecker.HasValue)
             {
                 this.memoryStorageSpaceChecker = this.memoryStorageSpaceChecker.Map(
-                    m => {
-                        m.SetStorageUsageComputer(GetTotalMemoryUsage);
+                    m =>
+                    {
+                        m.SetStorageUsageComputer(this.GetTotalMemoryUsage);
                         return m;
                     });
             }

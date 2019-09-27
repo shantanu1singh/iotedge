@@ -243,7 +243,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
                 timeToLiveSecs = storeAndForwardConfigurationSection.GetValue("timeToLiveSecs", defaultTtl);
             }
 
-            Option<long> maxStorageSpaceBytes = GetConfigurationValueIfExists("maxStorageSpaceBytes");
+            Option<long> maxStorageSpaceBytes = this.GetConfigurationValueIfExists("maxStorageSpaceBytes");
             var storeAndForwardConfiguration = new StoreAndForwardConfiguration(timeToLiveSecs, maxStorageSpaceBytes);
 
             int storageSpaceCheckFrequency = this.configuration.GetValue<int>("storageSpaceCheckFrequencySecs", Constants.StorageSpaceCheckFrequencyInSecs);

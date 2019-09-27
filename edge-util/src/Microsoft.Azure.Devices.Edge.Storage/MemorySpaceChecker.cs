@@ -8,7 +8,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
     public class MemorySpaceChecker : IStorageSpaceChecker
     {
-        enum MemoryUsageStatus
+        internal enum MemoryUsageStatus
         {
             Unknown = 0,
             Available,
@@ -26,12 +26,15 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             Preconditions.CheckNotNull(getTotalMemoryUsage, nameof(getTotalMemoryUsage));
             this.maxStorageSpaceBytes = maxStorageSpaceBytes;
             this.getTotalMemoryUsage = getTotalMemoryUsage;
-            this.storageSpaceChecker = new PeriodicTask(this.PeriodicTaskCallback, checkFrequency, TimeSpan.FromSeconds(5), Events.Log, "Memory usage check");
+            this.storageSpaceChecker = new PeriodicTask(this.PeriodicTaskCallback, checkFrequency, checkFrequency, Events.Log, "Memory usage check");
         }
 
         public Func<Task<long>> GetTotalMemoryUsage
         {
-            get { return this.getTotalMemoryUsage; }
+            get
+            {
+                return this.getTotalMemoryUsage;
+            }
             set
             {
                 Preconditions.CheckNotNull(value, nameof(value));
@@ -41,11 +44,16 @@ namespace Microsoft.Azure.Devices.Edge.Storage
 
         public bool IsFull => this.memoryUsageStatus == MemoryUsageStatus.Full;
 
-        public void SetStorageUsageComputer(Func<Task<long>> storageUsageComputer) => this.getTotalMemoryUsage = storageUsageComputer;
+        internal MemoryUsageStatus UsageStatus
+        {
+            get { return this.memoryUsageStatus; }
+        }
+
+        public void SetStorageUsageComputer(Func<Task<long>> storageUsageComputer) => this.GetTotalMemoryUsage = storageUsageComputer;
 
         public void SetMaxStorageSize(long maxStorageBytes)
         {
-            Events.SetMaxSizeDiskSpaceUsage(maxStorageBytes);
+            Events.SetMaxMemorySpaceUsage(maxStorageBytes);
             this.maxStorageSpaceBytes = maxStorageBytes;
         }
 
@@ -57,23 +65,20 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             }
             catch (Exception e)
             {
-                Events.Log.LogWarning(e, "Error updating memory usage status.");
+                Events.ErrorGettingMemoryUsageStatus(e);
             }
         }
 
         async Task<MemoryUsageStatus> GetMemoryUsageStatus()
         {
-            long memoryUsageBytes = await this.getTotalMemoryUsage();
-            Events.Log.LogInformation($"Memory usage bytes: {memoryUsageBytes}");
-            Events.Log.LogInformation($"Memory limit bytes: {this.maxStorageSpaceBytes}");
-
+            long memoryUsageBytes = await this.GetTotalMemoryUsage();
             double usagePercentage = (double)memoryUsageBytes * 100 / this.maxStorageSpaceBytes;
-            Events.Log.LogInformation($"Usage %: {usagePercentage}");
+            Events.MemoryUsageStats(memoryUsageBytes, usagePercentage, this.maxStorageSpaceBytes);
 
             MemoryUsageStatus memoryUsageStatus = GetMemoryUsageStatus(usagePercentage);
             if (memoryUsageStatus != MemoryUsageStatus.Available)
             {
-                Events.Log.LogWarning($"High memory usage detected - using {usagePercentage}% of {this.maxStorageSpaceBytes} bytes");
+                Events.HighMemoryUsageDetected(usagePercentage, this.maxStorageSpaceBytes);
             }
 
             return memoryUsageStatus;
@@ -102,16 +107,35 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             enum EventIds
             {
                 Created = IdStart,
-                SetMaxSizeDiskSpaceUsage,
-                SetMaxPercentageUsage,
-                FoundDrive,
-                NoMatchingDriveFound,
-                ErrorGettingMatchingDrive
+                ErrorGetMemoryUsageStatus,
+                HighMemoryUsageDetected,
+                MemoryUsageStats,
+                SetMaxMemorySpaceUsage
             }
 
-            public static void SetMaxSizeDiskSpaceUsage(long maxSizeBytes)
+            public static void Created()
             {
-                Log.LogInformation((int)EventIds.SetMaxSizeDiskSpaceUsage, $"Setting maximum memory space usage to {maxSizeBytes} bytes.");
+                Log.LogInformation((int)EventIds.Created, "Created maximum memory space usage checker.");
+            }
+
+            public static void ErrorGettingMemoryUsageStatus(Exception ex)
+            {
+                Log.LogWarning((int)EventIds.ErrorGetMemoryUsageStatus, ex, "Error occurred while getting memory usage status.");
+            }
+
+            public static void HighMemoryUsageDetected(double usagePercentage, long maxSizeBytes)
+            {
+                Log.LogWarning((int)EventIds.HighMemoryUsageDetected, $"High memory usage detected - using {usagePercentage}% of {maxSizeBytes} bytes");
+            }
+
+            public static void MemoryUsageStats(long consumedMemoryBytes, double usagePercentage, long maxSizeBytes)
+            {
+                Log.LogDebug((int)EventIds.MemoryUsageStats, $"Memory usage - Consuming {consumedMemoryBytes} bytes using {usagePercentage}% of {maxSizeBytes} bytes");
+            }
+
+            public static void SetMaxMemorySpaceUsage(long maxSizeBytes)
+            {
+                Log.LogInformation((int)EventIds.SetMaxMemorySpaceUsage, $"Setting maximum memory space usage to {maxSizeBytes} bytes.");
             }
         }
     }

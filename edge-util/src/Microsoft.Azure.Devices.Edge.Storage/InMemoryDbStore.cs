@@ -11,7 +11,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
     using Nito.AsyncEx;
 
     /// <summary>
-    /// Provides an in memory implementation of the IDbStore
+    /// Provides an in memory implementation of the IDbStore.
     /// </summary>
     class InMemoryDbStore : IDbStore
     {
@@ -132,7 +132,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage
             {
                 foreach (Item keyValue in this.keyValues)
                 {
-                    dbSize += (keyValue.Key.Length + keyValue.Value.Length);
+                    dbSize += keyValue.Key.Length + keyValue.Value.Length;
                 }
             }
 

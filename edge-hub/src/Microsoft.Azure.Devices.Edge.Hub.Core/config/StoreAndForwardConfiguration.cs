@@ -43,7 +43,8 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Config
                 return true;
             }
 
-            return this.TimeToLiveSecs == other.TimeToLiveSecs;
+            return this.TimeToLiveSecs == other.TimeToLiveSecs &&
+                this.MaxStorageSpaceBytes.Equals(other.MaxStorageSpaceBytes);
         }
 
         public override bool Equals(object obj)
@@ -53,7 +54,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Core.Config
         {
             unchecked
             {
-                return (this.TimeToLiveSecs * 397) ^ this.TimeToLive.GetHashCode();
+                int hashCode = (this.TimeToLiveSecs * 397) ^ this.TimeToLive.GetHashCode();
+                hashCode = (hashCode * 397) ^ this.MaxStorageSpaceBytes.GetHashCode();
+                return hashCode;
             }
         }
 

@@ -147,7 +147,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
                 c =>
                 {
                     IStorageSpaceChecker spaceChecker = this.maxStorageSpaceBytes.HasValue && !this.usePersistentStorage
-                       ? new MemorySpaceChecker(TimeSpan.FromSeconds(this.storageSpaceCheckFrequency), this.maxStorageSpaceBytes.GetOrElse(long.MaxValue), () => Task.FromResult((long)0)) as IStorageSpaceChecker
+                       ? new MemorySpaceChecker(TimeSpan.FromSeconds(this.storageSpaceCheckFrequency), this.maxStorageSpaceBytes.GetOrElse(long.MaxValue), () => Task.FromResult(0L)) as IStorageSpaceChecker
                        : new NullStorageSpaceChecker() as IStorageSpaceChecker;
                     return spaceChecker;
                 })
