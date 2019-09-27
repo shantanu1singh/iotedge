@@ -53,7 +53,7 @@ use edgelet_core::watchdog::Watchdog;
 use edgelet_core::{
     AttestationMethod, Authenticator, Certificate, CertificateIssuer, CertificateProperties,
     CertificateType, Dps, MakeModuleRuntime, ManualAuthMethod,
-    ManualDeviceConnectionString, ManualX509Auth, Module, ModuleRuntime, ModuleRuntimeErrorReason,
+    Module, ModuleRuntime, ModuleRuntimeErrorReason,
     ModuleSpec, Provisioning, ProvisioningResult as CoreProvisioningResult, RuntimeSettings,
     SymmetricKeyAttestationInfo, TpmAttestationInfo, WorkloadConfig,
 };
@@ -393,8 +393,13 @@ where
                 match manual.authentication_method() {
                     ManualAuthMethod::DeviceConnectionString(cs) => {
                         info!("Starting provisioning edge device via manual mode using a device connection string...");
+                        let (key, device_id, hub) = cs
+                            .parse_device_connection_string()
+                            .context(ErrorKind::Initialize(InitializeErrorReason::LoadSettings))?;
+                        let manual = ManualProvisioning::new(key, device_id, hub);
+
                         let (key_store, provisioning_result, root_key) =
-                            manual_provision_connection_string(&cs, &mut tokio_runtime)?;
+                            manual_provision_connection_string(manual, &mut tokio_runtime)?;
 
                         let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
@@ -417,10 +422,15 @@ where
                             ErrorKind::Initialize(InitializeErrorReason::ManualProvisioningClient)
                         })?;
 
+//                        let key = MemoryKey::new(key_bytes);
+                        let manual = ManualProvisioning::new(
+                            MemoryKey::new(key_bytes),
+                            x509.device_id().to_string(),
+                            x509.iothub_hostname().to_string(),
+                        );
                         let (key_store, provisioning_result, root_key) = manual_provision_x509(
-                            x509,
+                            manual,
                             &mut tokio_runtime,
-                            &key_bytes,
                             id_data.thumbprint.clone(),
                         )?;
                         let thumbprint_op = Some(id_data.thumbprint.as_str());
@@ -504,7 +514,7 @@ where
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
-                            y,
+                            external_provisioning_ref,
                         );
                     }
                 };
@@ -1508,13 +1518,9 @@ where
 }
 
 fn manual_provision_connection_string(
-    cs: &ManualDeviceConnectionString,
+    manual: ManualProvisioning,
     tokio_runtime: &mut tokio::runtime::Runtime,
 ) -> Result<(DerivedKeyStore<MemoryKey>, ProvisioningResult, MemoryKey), Error> {
-    let (key, device_id, hub) = cs
-        .parse_device_connection_string()
-        .context(ErrorKind::Initialize(InitializeErrorReason::LoadSettings))?;
-    let manual = ManualProvisioning::new(key, device_id, hub);
     let memory_hsm = MemoryKeyStore::new();
     let provision = manual
         .provision(memory_hsm.clone())
@@ -1540,17 +1546,10 @@ fn manual_provision_connection_string(
 }
 
 fn manual_provision_x509(
-    x509: &ManualX509Auth,
+    manual: ManualProvisioning,
     tokio_runtime: &mut tokio::runtime::Runtime,
-    hybrid_identity_key: &[u8],
     cert_thumbprint: String,
 ) -> Result<(DerivedKeyStore<MemoryKey>, ProvisioningResult, MemoryKey), Error> {
-    let key = MemoryKey::new(hybrid_identity_key);
-    let manual = ManualProvisioning::new(
-        key,
-        x509.device_id().to_string(),
-        x509.iothub_hostname().to_string(),
-    );
     let memory_hsm = MemoryKeyStore::new();
     let provision = manual
         .provision(memory_hsm.clone())
