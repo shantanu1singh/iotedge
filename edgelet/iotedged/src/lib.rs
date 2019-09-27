@@ -396,14 +396,14 @@ where
                         let (key_store, provisioning_result, root_key) =
                             manual_provision_connection_string(&cs, &mut tokio_runtime)?;
 
-                        let p = None as Option<&ManualProvisioning>;
+                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
-                            p,
+                            prov_as_none,
                         );
                     }
                     ManualAuthMethod::X509(x509) => {
@@ -424,14 +424,14 @@ where
                             id_data.thumbprint.clone(),
                         )?;
                         let thumbprint_op = Some(id_data.thumbprint.as_str());
-                        let p = None as Option<&ManualProvisioning>;
+                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
-                            p,
+                            prov_as_none,
                         );
                     }
                 };
@@ -456,8 +456,7 @@ where
                     )));
                 };
 
-                let y = external_provisioning.as_ref();
-
+                let external_provisioning_ref = external_provisioning.as_ref();
                 match credentials.auth_type() {
                     AuthType::SymmetricKey(symmetric_key) => {
                         if let Some(key) = symmetric_key.key() {
@@ -468,7 +467,7 @@ where
                                 memory_key,
                                 force_module_reprovision,
                                 None,
-                                y,
+                                external_provisioning_ref,
                             );
                         } else {
                             let (derived_key_store, tpm_key) =
@@ -479,7 +478,7 @@ where
                                 tpm_key,
                                 force_module_reprovision,
                                 None,
-                                y,
+                                external_provisioning_ref,
                             );
                         }
                     }
@@ -525,14 +524,14 @@ where
                             hsm_lock.clone(),
                         )?;
 
-                        let p = None as Option<&ManualProvisioning>;
+                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
-                            p,
+                            prov_as_none,
                         );
                     }
                     AttestationMethod::SymmetricKey(ref symmetric_key_info) => {
@@ -546,14 +545,14 @@ where
                                 symmetric_key_info,
                             )?;
 
-                        let p = None as Option<&ManualProvisioning>;
+                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
-                            p,
+                            prov_as_none,
                         );
                     }
                     AttestationMethod::X509(ref x509_info) => {
@@ -583,14 +582,14 @@ where
                             id_data.thumbprint.clone(),
                         )?;
                         let thumbprint_op = Some(id_data.thumbprint.as_str());
-                        let p = None as Option<&ManualProvisioning>;
+                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
-                            p,
+                            prov_as_none,
                         );
                     }
                 }
@@ -600,26 +599,6 @@ where
         info!("Shutdown complete.");
         Ok(())
     }
-}
-
-fn retrieve_external_provisioning_info(
-    external_provisioning: &ExternalProvisioning<ExternalProvisioningClient, MemoryKeyStore>,
-    tokio_runtime: &mut tokio::runtime::Runtime,
-) -> Result<ProvisioningResult, Error>
-{
-    info!("Retrieving provisioning information from the external endpoint...");
-    let provision_fut = external_provisioning
-        .clone()
-        .provision(MemoryKeyStore::new())
-        .map_err(|err| {
-            Error::from(err.context(ErrorKind::Initialize(
-                InitializeErrorReason::ExternalProvisioningClient(
-                    ExternalProvisioningErrorReason::Provisioning,
-                ),
-            )))
-        });
-
-    tokio_runtime.block_on(provision_fut)
 }
 
 fn get_external_provisioning_info<S>(
@@ -643,7 +622,20 @@ where
                 ),
             ))?;
         let external_provisioning = ExternalProvisioning::new(external_provisioning_client);
-        let prov_info = retrieve_external_provisioning_info(&external_provisioning, tokio_runtime)?;
+
+        info!("Retrieving provisioning information from the external endpoint...");
+        let provision_fut = external_provisioning
+            .clone()
+            .provision(MemoryKeyStore::new())
+            .map_err(|err| {
+                Error::from(err.context(ErrorKind::Initialize(
+                    InitializeErrorReason::ExternalProvisioningClient(
+                        ExternalProvisioningErrorReason::Provisioning,
+                    ),
+                )))
+            });
+
+        let prov_info = tokio_runtime.block_on(provision_fut)?;
 
         if let Some(credentials) = prov_info.credentials() {
             if let CredentialSource::Payload = credentials.source() {
@@ -1919,10 +1911,6 @@ where
     env.insert(API_VERSION_KEY.to_string(), API_VERSION.to_string());
     env
 }
-
-//trait AssetTrait {
-//    fn load(path: ManualProvisioning) -> Self;
-//}
 
 fn start_management<C, K, HC, M, P>(
     settings: &M::Settings,

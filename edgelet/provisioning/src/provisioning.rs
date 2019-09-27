@@ -382,9 +382,11 @@ where
             .map_err(|err| Error::from(err.context(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::ProvisioningFailure))))
             .and_then(move |device_provisioning_info| {
                 info!(
-                    "External device registration information: Device \"{}\" in hub \"{}\"",
+                    "External device registration information: Device \"{}\" in hub \"{}\" with credential type \"{}\" and credential source \"{}\"",
                     device_provisioning_info.device_id(),
-                    device_provisioning_info.hub_name()
+                    device_provisioning_info.hub_name(),
+                    device_provisioning_info.credentials().auth_type(),
+                    device_provisioning_info.credentials().source(),
                 );
 
                 let credentials_info = device_provisioning_info.credentials();
@@ -425,9 +427,11 @@ where
             .map_err(|err| Error::from(err.context(ErrorKind::ExternalProvisioning(ExternalProvisioningErrorReason::ReprovisioningFailure))))
             .and_then(move |device_provisioning_info| {
                 info!(
-                    "External device registration information after reprovisioning: Device \"{}\" in hub \"{}\"",
+                    "External device registration information after reprovisioning: Device \"{}\" in hub \"{}\" with credential type \"{}\" and credential source \"{}\"",
                     device_provisioning_info.device_id(),
-                    device_provisioning_info.hub_name()
+                    device_provisioning_info.hub_name(),
+                    device_provisioning_info.credentials().auth_type(),
+                    device_provisioning_info.credentials().source(),
                 );
 
                 Ok(())
@@ -531,6 +535,7 @@ where
     fn reprovision(
         self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
     }
 }
@@ -619,6 +624,7 @@ where
     fn reprovision(
         self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
     }
 }
@@ -709,6 +715,7 @@ where
     fn reprovision(
         self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
     }
 }
@@ -841,7 +848,7 @@ where
     fn reprovision(
         self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
-        Box::new(future::ok(()))
+        panic!("A reprovisioning operation is not expected for `BackupProvisioning`")
     }
 }
 
