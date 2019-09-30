@@ -1829,42 +1829,6 @@ fn dps_tpm_provision<HC>(
 where
     HC: 'static + ClientImpl,
 {
-//    let tpm = Tpm::new().context(ErrorKind::Initialize(
-//        InitializeErrorReason::DpsProvisioningClient,
-//    ))?;
-//
-//    let hsm_version = tpm
-//        .get_version()
-//        .context(ErrorKind::Initialize(InitializeErrorReason::Hsm))?;
-//
-//    if hsm_version != IOTEDGE_COMPAT_HSM_VERSION {
-//        info!(
-//            "Incompatible HSM interface version for TPM. Found {}, required {}",
-//            hsm_version, IOTEDGE_COMPAT_HSM_VERSION
-//        );
-//        return Err(Error::from(ErrorKind::Initialize(
-//            InitializeErrorReason::IncompatibleHsmVersion,
-//        )));
-//    }
-//
-//    let ek_result = tpm.get_ek().context(ErrorKind::Initialize(
-//        InitializeErrorReason::DpsProvisioningClient,
-//    ))?;
-//    let srk_result = tpm.get_srk().context(ErrorKind::Initialize(
-//        InitializeErrorReason::DpsProvisioningClient,
-//    ))?;
-//    let dps = DpsTpmProvisioning::new(
-//        hyper_client,
-//        provisioning.global_endpoint().clone(),
-//        provisioning.scope_id().to_string(),
-//        tpm_attestation_info.registration_id().to_string(),
-//        DPS_API_VERSION.to_string(),
-//        ek_result,
-//        srk_result,
-//    )
-//    .context(ErrorKind::Initialize(
-//        InitializeErrorReason::DpsProvisioningClient,
-//    ))?;
     let tpm_hsm = TpmKeyStore::from_hsm(tpm, hsm_lock).context(ErrorKind::Initialize(
         InitializeErrorReason::DpsProvisioningClient,
     ))?;

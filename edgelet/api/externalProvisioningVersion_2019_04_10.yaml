@@ -67,6 +67,23 @@ definitions:
         example: device01
       credentials:
         $ref: '#/definitions/Credentials'
+      status:
+        type: string
+        description: The registration/provisioning status of the device in IoT hub.
+        enum:
+          - assigned
+          - assigning
+          - disabled
+          - failed
+          - unassigned
+      substatus:
+        type: string
+        description: The registration/provisioning sub-status of 'assigned' devices in IoT hub.
+        enum:
+          - deviceDataMigrated
+          - deviceDataReset
+          - initialAssignment
+          - deviceDataUpdated
     required:
       - hubName
       - deviceId
