@@ -366,7 +366,7 @@ where
                         make_shutdown_signal(),
                         &crypto,
                         &mut tokio_runtime,
-                        $provision,
+                        &$provision,
                     )?;
 
                     if code != StartApiReturnStatus::Restart {
@@ -399,16 +399,15 @@ where
                         let manual = ManualProvisioning::new(key, device_id, hub);
 
                         let (key_store, provisioning_result, root_key) =
-                            manual_provision_connection_string(manual, &mut tokio_runtime)?;
+                            manual_provision_connection_string(manual.clone(), &mut tokio_runtime)?;
 
-                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
-                            prov_as_none,
+                            manual,
                         );
                     }
                     ManualAuthMethod::X509(x509) => {
@@ -422,26 +421,24 @@ where
                             ErrorKind::Initialize(InitializeErrorReason::ManualProvisioningClient)
                         })?;
 
-//                        let key = MemoryKey::new(key_bytes);
                         let manual = ManualProvisioning::new(
                             MemoryKey::new(key_bytes),
                             x509.device_id().to_string(),
                             x509.iothub_hostname().to_string(),
                         );
                         let (key_store, provisioning_result, root_key) = manual_provision_x509(
-                            manual,
+                            manual.clone(),
                             &mut tokio_runtime,
                             id_data.thumbprint.clone(),
                         )?;
                         let thumbprint_op = Some(id_data.thumbprint.as_str());
-                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
-                            prov_as_none,
+                            manual,
                         );
                     }
                 };
@@ -466,7 +463,11 @@ where
                     )));
                 };
 
-                let external_provisioning_ref = external_provisioning.as_ref();
+                let external_provisioning_val = external_provisioning.ok_or_else(|| {
+                    ErrorKind::Initialize(InitializeErrorReason::ExternalProvisioningClient(
+                        ExternalProvisioningErrorReason::Provisioning,
+                    ))
+                })?;
                 match credentials.auth_type() {
                     AuthType::SymmetricKey(symmetric_key) => {
                         if let Some(key) = symmetric_key.key() {
@@ -477,7 +478,7 @@ where
                                 memory_key,
                                 force_module_reprovision,
                                 None,
-                                external_provisioning_ref,
+                                external_provisioning_val,
                             );
                         } else {
                             let (derived_key_store, tpm_key) =
@@ -488,7 +489,7 @@ where
                                 tpm_key,
                                 force_module_reprovision,
                                 None,
-                                external_provisioning_ref,
+                                external_provisioning_val,
                             );
                         }
                     }
@@ -514,7 +515,7 @@ where
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
-                            external_provisioning_ref,
+                            external_provisioning_val,
                         );
                     }
                 };
@@ -525,44 +526,51 @@ where
                 match dps.attestation() {
                     AttestationMethod::Tpm(ref tpm) => {
                         info!("Starting provisioning edge device via TPM...");
-                        let (key_store, provisioning_result, root_key) = dps_tpm_provision(
+                        let (tpm_instance, dps_tpm) = dps_tpm_provision_init(
                             &dps,
                             hyper_client.clone(),
+                            tpm,
+                        )?;
+                        let (key_store, provisioning_result, root_key) = dps_tpm_provision(
                             dps_path,
                             &mut tokio_runtime,
-                            tpm,
                             hsm_lock.clone(),
+tpm_instance,
+                            dps_tpm.clone(),
                         )?;
 
-                        let prov_as_none = None as Option<&ManualProvisioning>;
+                        let t = dps_tpm.clone();
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
-                            prov_as_none,
+                            t,
                         );
                     }
                     AttestationMethod::SymmetricKey(ref symmetric_key_info) => {
                         info!("Starting provisioning edge device via symmetric key...");
+                        let (memory_hsm, dps_symmetric_key) = dps_symmetric_key_provision_init(
+                            &dps,
+                            hyper_client.clone(),
+                            symmetric_key_info,
+                        )?;
                         let (key_store, provisioning_result, root_key) =
                             dps_symmetric_key_provision(
-                                &dps,
-                                hyper_client.clone(),
                                 dps_path,
                                 &mut tokio_runtime,
-                                symmetric_key_info,
+                                memory_hsm,
+                                dps_symmetric_key.clone(),
                             )?;
 
-                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             None,
-                            prov_as_none,
+                            dps_symmetric_key,
                         );
                     }
                     AttestationMethod::X509(ref x509_info) => {
@@ -582,24 +590,40 @@ where
                             ErrorKind::Initialize(InitializeErrorReason::DpsProvisioningClient)
                         })?;
 
-                        let (key_store, provisioning_result, root_key) = dps_x509_provision(
-                            reg_id,
-                            &dps,
+                        let mut memory_hsm = MemoryKeyStore::new();
+                        memory_hsm
+                            .activate_identity_key(
+                                KeyIdentity::Device,
+                                "primary".to_string(),
+                                key_bytes,
+                            )
+                            .context(ErrorKind::ActivateSymmetricKey)?;
+                        let dps_x509 = DpsX509Provisioning::new(
                             hyper_client.clone(),
+                            dps.global_endpoint().clone(),
+                            dps.scope_id().to_string(),
+                            reg_id,
+                            DPS_API_VERSION.to_string(),
+                        )
+                            .context(ErrorKind::Initialize(
+                                InitializeErrorReason::DpsProvisioningClient,
+                            ))?;
+
+                        let (key_store, provisioning_result, root_key) = dps_x509_provision(
+                            memory_hsm,
+                            dps_x509.clone(),
                             dps_path,
                             &mut tokio_runtime,
-                            &key_bytes,
                             id_data.thumbprint.clone(),
                         )?;
                         let thumbprint_op = Some(id_data.thumbprint.as_str());
-                        let prov_as_none = None as Option<&ManualProvisioning>;
                         start_edgelet!(
                             key_store,
                             provisioning_result,
                             root_key,
                             force_module_reprovision,
                             thumbprint_op,
-                            prov_as_none,
+                            dps_x509,
                         );
                     }
                 }
@@ -1361,7 +1385,7 @@ fn start_api<HC, K, F, C, W, M, P>(
     shutdown_signal: F,
     crypto: &C,
     tokio_runtime: &mut tokio::runtime::Runtime,
-    provisioning: Option<&P>,
+    provisioning: &P,
 ) -> Result<StartApiReturnStatus, Error>
 where
     F: Future<Item = (), Error = ()> + Send + 'static,
@@ -1570,62 +1594,6 @@ fn manual_provision_x509(
     tokio_runtime.block_on(provision)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn dps_x509_provision<HC>(
-    reg_id: String,
-    provisioning: &Dps,
-    hyper_client: HC,
-    backup_path: PathBuf,
-    tokio_runtime: &mut tokio::runtime::Runtime,
-    hybrid_identity_key: &[u8],
-    cert_thumbprint: String,
-) -> Result<(DerivedKeyStore<MemoryKey>, ProvisioningResult, MemoryKey), Error>
-where
-    HC: 'static + ClientImpl,
-{
-    let mut memory_hsm = MemoryKeyStore::new();
-
-    memory_hsm
-        .activate_identity_key(
-            KeyIdentity::Device,
-            "primary".to_string(),
-            hybrid_identity_key,
-        )
-        .context(ErrorKind::ActivateSymmetricKey)?;
-
-    let dps = DpsX509Provisioning::new(
-        hyper_client,
-        provisioning.global_endpoint().clone(),
-        provisioning.scope_id().to_string(),
-        reg_id,
-        DPS_API_VERSION.to_string(),
-    )
-    .context(ErrorKind::Initialize(
-        InitializeErrorReason::DpsProvisioningClient,
-    ))?;
-
-    let provision_with_file_backup = BackupProvisioning::new(dps, backup_path);
-
-    let provision = provision_with_file_backup
-        .provision(memory_hsm.clone())
-        .map_err(|err| {
-            Error::from(err.context(ErrorKind::Initialize(
-                InitializeErrorReason::DpsProvisioningClient,
-            )))
-        })
-        .and_then(move |prov_result| {
-            info!("Successful DPS provisioning.");
-            let (derived_key_store, hybrid_derived_key) = prepare_derived_hybrid_key(
-                &memory_hsm,
-                &cert_thumbprint,
-                prov_result.hub_name(),
-                prov_result.device_id(),
-            )?;
-            Ok((derived_key_store, prov_result, hybrid_derived_key))
-        });
-    tokio_runtime.block_on(provision)
-}
-
 fn prepare_derived_hybrid_key(
     key_store: &MemoryKeyStore,
     cert_thumbprint: &str,
@@ -1646,6 +1614,39 @@ fn prepare_derived_hybrid_key(
     let hybrid_derived_key = MemoryKey::new(digest.as_bytes());
     let derived_key_store = DerivedKeyStore::new(hybrid_derived_key.clone());
     Ok((derived_key_store, hybrid_derived_key))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn dps_x509_provision<HC>(
+    memory_hsm: MemoryKeyStore,
+    dps: DpsX509Provisioning<HC>,
+    backup_path: PathBuf,
+    tokio_runtime: &mut tokio::runtime::Runtime,
+    cert_thumbprint: String,
+) -> Result<(DerivedKeyStore<MemoryKey>, ProvisioningResult, MemoryKey), Error>
+    where
+        HC: 'static + ClientImpl,
+{
+    let provision_with_file_backup = BackupProvisioning::new(dps, backup_path);
+
+    let provision = provision_with_file_backup
+        .provision(memory_hsm.clone())
+        .map_err(|err| {
+            Error::from(err.context(ErrorKind::Initialize(
+                InitializeErrorReason::DpsProvisioningClient,
+            )))
+        })
+        .and_then(move |prov_result| {
+            info!("Successful DPS provisioning.");
+            let (derived_key_store, hybrid_derived_key) = prepare_derived_hybrid_key(
+                &memory_hsm,
+                &cert_thumbprint,
+                prov_result.hub_name(),
+                prov_result.device_id(),
+            )?;
+            Ok((derived_key_store, prov_result, hybrid_derived_key))
+        });
+    tokio_runtime.block_on(provision)
 }
 
 fn external_provision_payload(key: &[u8]) -> (DerivedKeyStore<MemoryKey>, MemoryKey) {
@@ -1711,15 +1712,13 @@ fn external_provision_x509(
     Ok((derived_key_store, hybrid_derived_key))
 }
 
-fn dps_symmetric_key_provision<HC>(
+fn dps_symmetric_key_provision_init<HC>(
     provisioning: &Dps,
     hyper_client: HC,
-    backup_path: PathBuf,
-    tokio_runtime: &mut tokio::runtime::Runtime,
     key: &SymmetricKeyAttestationInfo,
-) -> Result<(DerivedKeyStore<MemoryKey>, ProvisioningResult, MemoryKey), Error>
-where
-    HC: 'static + ClientImpl,
+) -> Result<(MemoryKeyStore, DpsSymmetricKeyProvisioning<HC>), Error>
+    where
+        HC: 'static + ClientImpl,
 {
     let mut memory_hsm = MemoryKeyStore::new();
     let key_bytes =
@@ -1736,9 +1735,21 @@ where
         key.registration_id().to_string(),
         DPS_API_VERSION.to_string(),
     )
-    .context(ErrorKind::Initialize(
-        InitializeErrorReason::DpsProvisioningClient,
-    ))?;
+        .context(ErrorKind::Initialize(
+            InitializeErrorReason::DpsProvisioningClient,
+        ))?;
+    Ok((memory_hsm, dps))
+}
+
+fn dps_symmetric_key_provision<HC>(
+    backup_path: PathBuf,
+    tokio_runtime: &mut tokio::runtime::Runtime,
+    memory_hsm: MemoryKeyStore,
+    dps: DpsSymmetricKeyProvisioning<HC>,
+) -> Result<(DerivedKeyStore<MemoryKey>, ProvisioningResult, MemoryKey), Error>
+where
+    HC: 'static + ClientImpl,
+{
     let provision_with_file_backup = BackupProvisioning::new(dps, backup_path);
 
     let provision =
@@ -1761,16 +1772,13 @@ where
     tokio_runtime.block_on(provision)
 }
 
-fn dps_tpm_provision<HC>(
+fn dps_tpm_provision_init<HC>(
     provisioning: &Dps,
     hyper_client: HC,
-    backup_path: PathBuf,
-    tokio_runtime: &mut tokio::runtime::Runtime,
     tpm_attestation_info: &TpmAttestationInfo,
-    hsm_lock: Arc<HsmLock>,
-) -> Result<(DerivedKeyStore<TpmKey>, ProvisioningResult, TpmKey, DpsTpmProvisioning<HC>), Error>
-where
-    HC: 'static + ClientImpl,
+) -> Result<(Tpm, DpsTpmProvisioning<HC>), Error>
+    where
+        HC: 'static + ClientImpl,
 {
     let tpm = Tpm::new().context(ErrorKind::Initialize(
         InitializeErrorReason::DpsProvisioningClient,
@@ -1805,9 +1813,58 @@ where
         ek_result,
         srk_result,
     )
-    .context(ErrorKind::Initialize(
-        InitializeErrorReason::DpsProvisioningClient,
-    ))?;
+        .context(ErrorKind::Initialize(
+            InitializeErrorReason::DpsProvisioningClient,
+        ))?;
+    Ok((tpm, dps))
+}
+
+fn dps_tpm_provision<HC>(
+    backup_path: PathBuf,
+    tokio_runtime: &mut tokio::runtime::Runtime,
+    hsm_lock: Arc<HsmLock>,
+    tpm: Tpm,
+    dps: DpsTpmProvisioning<HC>,
+) -> Result<(DerivedKeyStore<TpmKey>, ProvisioningResult, TpmKey), Error>
+where
+    HC: 'static + ClientImpl,
+{
+//    let tpm = Tpm::new().context(ErrorKind::Initialize(
+//        InitializeErrorReason::DpsProvisioningClient,
+//    ))?;
+//
+//    let hsm_version = tpm
+//        .get_version()
+//        .context(ErrorKind::Initialize(InitializeErrorReason::Hsm))?;
+//
+//    if hsm_version != IOTEDGE_COMPAT_HSM_VERSION {
+//        info!(
+//            "Incompatible HSM interface version for TPM. Found {}, required {}",
+//            hsm_version, IOTEDGE_COMPAT_HSM_VERSION
+//        );
+//        return Err(Error::from(ErrorKind::Initialize(
+//            InitializeErrorReason::IncompatibleHsmVersion,
+//        )));
+//    }
+//
+//    let ek_result = tpm.get_ek().context(ErrorKind::Initialize(
+//        InitializeErrorReason::DpsProvisioningClient,
+//    ))?;
+//    let srk_result = tpm.get_srk().context(ErrorKind::Initialize(
+//        InitializeErrorReason::DpsProvisioningClient,
+//    ))?;
+//    let dps = DpsTpmProvisioning::new(
+//        hyper_client,
+//        provisioning.global_endpoint().clone(),
+//        provisioning.scope_id().to_string(),
+//        tpm_attestation_info.registration_id().to_string(),
+//        DPS_API_VERSION.to_string(),
+//        ek_result,
+//        srk_result,
+//    )
+//    .context(ErrorKind::Initialize(
+//        InitializeErrorReason::DpsProvisioningClient,
+//    ))?;
     let tpm_hsm = TpmKeyStore::from_hsm(tpm, hsm_lock).context(ErrorKind::Initialize(
         InitializeErrorReason::DpsProvisioningClient,
     ))?;
@@ -1826,7 +1883,7 @@ where
                     InitializeErrorReason::DpsProvisioningClient,
                 ))?;
             let derived_key_store = DerivedKeyStore::new(k.clone());
-            Ok((derived_key_store, prov_result, k, dps))
+            Ok((derived_key_store, prov_result, k))
         });
 
     tokio_runtime.block_on(provision)
@@ -1917,7 +1974,7 @@ fn start_management<C, K, HC, M, P>(
     id_man: &HubIdentityManager<DerivedKeyStore<K>, HC, K>,
     shutdown: Receiver<()>,
     cert_manager: Arc<CertificateManager<C>>,
-    provision: Option<&P>,
+    provision: &P,
 ) -> impl Future<Item = (), Error = Error>
 where
     C: CreateCertificate + Clone,
@@ -1935,13 +1992,7 @@ where
 
     let label = "mgmt".to_string();
     let url = settings.listen().management_uri().clone();
-
-//    let k = P::default();
-//    let man = ManualProvisioning::new(MemoryKey::new("".as_bytes()), "".to_string(), "".to_string());
-
-    let x = provision.unwrap();
-
-    ManagementService::new(runtime, id_man, x)
+    ManagementService::new(runtime, id_man, provision)
         .then(move |service| -> Result<_, Error> {
             let service = service.context(ErrorKind::Initialize(
                 InitializeErrorReason::ManagementService,

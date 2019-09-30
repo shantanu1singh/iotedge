@@ -441,6 +441,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct DpsTpmProvisioning<C>
 where
     C: ClientImpl,
@@ -540,6 +541,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct DpsSymmetricKeyProvisioning<C>
 where
     C: ClientImpl,
@@ -629,6 +631,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct DpsX509Provisioning<C>
 where
     C: ClientImpl,
