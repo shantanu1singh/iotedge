@@ -29,10 +29,12 @@ use std::io::{Read, Write};
 //use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+//use std::sync::mpsc::{ Sender, Receiver };
+use std::sync::mpsc;
 
 use failure::{Context, Fail, ResultExt};
 use futures::future::{Either, IntoFuture};
-use futures::sync::oneshot::{self, Receiver};
+use futures::sync::oneshot::{self, Receiver, Sender};
 use futures::{future, Future};
 use hyper::server::conn::Http;
 use hyper::{Body, Request, Uri};
@@ -1427,6 +1429,7 @@ where
     let id_man = HubIdentityManager::new(key_store.clone(), device_client);
 
     let (mgmt_tx, mgmt_rx) = oneshot::channel();
+    let (mgmt_stop_tx, mgmt_stop_rx) = mpsc::channel();
     let (work_tx, work_rx) = oneshot::channel();
 
     let edgelet_cert_props = CertificateProperties::new(
@@ -1461,7 +1464,7 @@ where
     let cert_manager = Arc::new(cert_manager);
 
     let mgmt =
-        start_management::<_, _, _, M, _>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone(), provisioning);
+        start_management::<_, _, _, M, _>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone(), mgmt_stop_tx);
 
     let workload = start_workload::<_, _, _, _, M>(
         settings,
@@ -1486,18 +1489,30 @@ where
     // Wait for the watchdog to finish, and then send signal to the workload and management services.
     // This way the edgeAgent can finish shutting down all modules.
 
-    let edge_rt_with_cleanup = edge_rt.select2(restart_rx).then(move |res| {
+    let edge_rt_with_cleanup = edge_rt.select2(restart_rx.select(mgmt_stop_rx)).then(move |res| {
         mgmt_tx.send(()).unwrap_or(());
         work_tx.send(()).unwrap_or(());
+
+        if let Ok(Either::B(Either::B(_))) = res
+        {
+        provisioning.reprovision().context(
+            ErrorKind::Initialize(InitializeErrorReason::InvalidHubConfig),
+        )?;
+        }
 
         // A -> EdgeRt Future
         // B -> Restart Signal Future
         match res {
             Ok(Either::A(_)) => Ok(StartApiReturnStatus::Shutdown).into_future(),
-            Ok(Either::B(_)) => Ok(StartApiReturnStatus::Restart).into_future(),
+            Ok(Either::B(Either::A(_))) => Ok(StartApiReturnStatus::Restart).into_future(),
+            Ok(Either::B(_)) => Ok(StartApiReturnStatus::Shutdown).into_future(),
             Err(Either::A((err, _))) => Err(err).into_future(),
-            Err(Either::B(_)) => {
+            Err(Either::B(Either::A(_))) => {
                 debug!("The restart signal failed, shutting down.");
+                Ok(StartApiReturnStatus::Shutdown).into_future()
+            },
+            Err(Either::B(_)) => {
+                debug!("The mgmt shutdown signal failed, shutting down.");
                 Ok(StartApiReturnStatus::Shutdown).into_future()
             }
         }
@@ -1938,7 +1953,7 @@ fn start_management<C, K, HC, M, P>(
     id_man: &HubIdentityManager<DerivedKeyStore<K>, HC, K>,
     shutdown: Receiver<()>,
     cert_manager: Arc<CertificateManager<C>>,
-    provision: &P,
+    initiate_shutdown: Sender<()>,
 ) -> impl Future<Item = (), Error = Error>
 where
     C: CreateCertificate + Clone,
@@ -1956,7 +1971,7 @@ where
 
     let label = "mgmt".to_string();
     let url = settings.listen().management_uri().clone();
-    ManagementService::new(runtime, id_man, provision)
+    ManagementService::new(runtime, id_man, initiate_shutdown)
         .then(move |service| -> Result<_, Error> {
             let service = service.context(ErrorKind::Initialize(
                 InitializeErrorReason::ManagementService,
