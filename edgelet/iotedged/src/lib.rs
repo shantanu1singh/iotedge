@@ -1489,10 +1489,20 @@ where
     // Wait for the watchdog to finish, and then send signal to the workload and management services.
     // This way the edgeAgent can finish shutting down all modules.
     let mgmt_stop_signaled = mgmt_stop_rx
-        .for_each(move |_| {
+        .then(|res| {
             info!("Mgmt indicated shut down.");
-        Ok(())
-    }).map_err(|_| ());
+            match res {
+                Ok(_) => Err(None),
+                Err(e) => Err(Some(e)),
+            }
+        })
+        .for_each(move |_x: Option<Error>| {
+            info!("Mgmt indicated shut down for each.");
+            Ok(())
+    })
+        .map_err(|e| if let None = e {
+    debug!("known error");
+});
 //    tokio_runtime.spawn(mgmt_stop_signaled);
 
     let k = edge_rt.select2(mgmt_stop_signaled).then(|res| {
