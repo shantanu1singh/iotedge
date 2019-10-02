@@ -1,9 +1,11 @@
 // Copyright (c) Microsoft. All rights reserved.
 
+//use std::sync::Mutex;
 use failure::{Compat, Fail, ResultExt};
 use futures::{future, Future};
 //use futures::sync::oneshot::{Sender};
-use std::sync::mpsc::{Sender};
+//use futures::sync::mpsc::{Sender};
+use futures::sync::mpsc::{UnboundedSender};
 
 use hyper::service::{NewService, Service};
 use hyper::{Body, Request};
@@ -43,7 +45,8 @@ pub struct ManagementService {
 
 impl ManagementService {
 //    pub fn new<M, I, P>(runtime: &M, identity: &I, initiate_shutdown: &Sender<()>,) -> impl Future<Item = Self, Error = Error>
-    pub fn new<M, I>(runtime: &M, identity: &I, initiate_shutdown: Sender<()>,) -> impl Future<Item = Self, Error = Error>
+//    pub fn new<M, I>(runtime: &M, identity: &I, initiate_shutdown: Sender<()>,) -> impl Future<Item = Self, Error = Error>
+    pub fn new<M, I>(runtime: &M, identity: &I, initiate_shutdown: UnboundedSender<()>,) -> impl Future<Item = Self, Error = Error>
     where
         M: ModuleRuntime + Authenticator<Request = Request<Body>> + Clone + Send + Sync + 'static,
         for<'r> &'r <M as ModuleRuntime>::Error: Into<ModuleRuntimeErrorReason>,
@@ -54,7 +57,8 @@ impl ManagementService {
         <M::AuthenticateFuture as Future>::Error: Fail,
 //        P: Provision + Clone + Send + Sync + 'static,
     {
-        let initiate_shutdown = initiate_shutdown.clone();
+//        let initiate_shutdown = initiate_shutdown.clone();
+//        let initiate_shutdown = Mutex::new(initiate_shutdown);
 
         let router = router!(
             get     Version2018_06_28 runtime Policy::Anonymous             => "/modules"                           => ListModules::new(runtime.clone()),
@@ -75,7 +79,7 @@ impl ManagementService {
 
             get     Version2018_06_28 runtime Policy::Anonymous             => "/systeminfo"                        => GetSystemInfo::new(runtime.clone()),
 
-            post    Version2019_01_30 runtime Policy::Module(&*AGENT_NAME)  => "/device/reprovision"                => ReprovisionDevice::new(initiate_shutdown.to_owned()),
+            post    Version2019_01_30 runtime Policy::Module(&*AGENT_NAME)  => "/device/reprovision"                => ReprovisionDevice::new(initiate_shutdown),
         );
 
         router.new_service().then(|inner| {

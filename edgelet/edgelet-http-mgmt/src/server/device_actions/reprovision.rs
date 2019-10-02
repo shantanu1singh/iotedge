@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved.
 
 //use std::sync::Arc;
-
+//use std::sync::Mutex;
 use failure::ResultExt;
 //use futures::Future;
 use futures::{Future, IntoFuture};
@@ -12,10 +12,13 @@ use edgelet_http::route::{Handler, Parameters};
 use edgelet_http::Error as HttpError;
 //use provisioning::provisioning::{Provision};
 //use futures::sync::oneshot::{Sender};
-use std::sync::mpsc::{Sender};
+//use std::sync::mpsc::{Sender};
+//use futures::sync::mpsc::{Sender};
+use futures::sync::mpsc::{UnboundedSender};
 
 use crate::error::{Error, ErrorKind};
 use crate::IntoResponse;
+//use futures::sink::Sink;
 //use crate::IntoResponse;
 
 //pub struct ReprovisionDevice<P> {
@@ -57,12 +60,17 @@ use crate::IntoResponse;
 
 pub struct ReprovisionDevice {
 //    initiate_shutdown: Arc<Sender<()>>,
-    initiate_shutdown: Sender<()>,
+//    initiate_shutdown: Sender<()>,
+initiate_shutdown: UnboundedSender<()>,
+//    initiate_shutdown: Mutex<Sender<()>>,
 }
 
 impl ReprovisionDevice {
-    pub fn new(initiate_shutdown: Sender<()>,) -> Self {
+//    pub fn new(initiate_shutdown: Sender<()>,) -> Self {
+        pub fn new(initiate_shutdown: UnboundedSender<()>,) -> Self {
+//        pub fn new(initiate_shutdown: Mutex<Sender<()>>,) -> Self {
 //        ReprovisionDevice { initiate_shutdown: Arc::new(initiate_shutdown) }
+//        ReprovisionDevice { initiate_shutdown }
         ReprovisionDevice { initiate_shutdown }
     }
 }
@@ -79,7 +87,8 @@ impl Handler<Parameters> for ReprovisionDevice
         debug!("Reprovision Device");
 //        let provision = self.provision.clone();
 
-        let response = self.initiate_shutdown.send(())
+        let response = self.initiate_shutdown.unbounded_send(())
+//        let response = self.initiate_shutdown.lock().unwrap().send()
             .map_err(|_| Error::from(ErrorKind::ReprovisionDevice))
             .and_then(|_| -> Result<_, Error> {
                 let response = Response::builder()

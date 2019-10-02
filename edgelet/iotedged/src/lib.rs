@@ -30,12 +30,12 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 //use std::sync::mpsc::{ Sender, Receiver };
-use std::sync::mpsc;
+use futures::sync::mpsc;
 
 use failure::{Context, Fail, ResultExt};
 use futures::future::{Either, IntoFuture};
-use futures::sync::oneshot::{self, Receiver, Sender};
-use futures::{future, Future};
+use futures::sync::oneshot::{self, Receiver};
+use futures::{future, Future, Stream};
 use hyper::server::conn::Http;
 use hyper::{Body, Request, Uri};
 use log::{debug, info, Level};
@@ -1429,7 +1429,7 @@ where
     let id_man = HubIdentityManager::new(key_store.clone(), device_client);
 
     let (mgmt_tx, mgmt_rx) = oneshot::channel();
-    let (mgmt_stop_tx, mgmt_stop_rx) = mpsc::channel();
+    let (mgmt_stop_tx, mgmt_stop_rx) = mpsc::unbounded();
     let (work_tx, work_rx) = oneshot::channel();
 
     let edgelet_cert_props = CertificateProperties::new(
@@ -1464,7 +1464,7 @@ where
     let cert_manager = Arc::new(cert_manager);
 
     let mgmt =
-        start_management::<_, _, _, M, _>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone(), mgmt_stop_tx);
+        start_management::<_, _, _, M,>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone(), mgmt_stop_tx);
 
     let workload = start_workload::<_, _, _, _, M>(
         settings,
@@ -1488,32 +1488,45 @@ where
 
     // Wait for the watchdog to finish, and then send signal to the workload and management services.
     // This way the edgeAgent can finish shutting down all modules.
+    let mgmt_stop_signaled = mgmt_stop_rx
+        .for_each(move |_| {
+            info!("Mgmt indicated shut down.");
+        Ok(())
+    }).map_err(|_| ());
+//    tokio_runtime.spawn(mgmt_stop_signaled);
 
-    let edge_rt_with_cleanup = edge_rt.select2(restart_rx.select(mgmt_stop_rx)).then(move |res| {
-        mgmt_tx.send(()).unwrap_or(());
-        work_tx.send(()).unwrap_or(());
-
-        if let Ok(Either::B(Either::B(_))) = res
-        {
-        provisioning.reprovision().context(
-            ErrorKind::Initialize(InitializeErrorReason::InvalidHubConfig),
-        )?;
-        }
-
+    let k = edge_rt.select2(mgmt_stop_signaled).then(|res| {
         // A -> EdgeRt Future
         // B -> Restart Signal Future
         match res {
-            Ok(Either::A(_)) => Ok(StartApiReturnStatus::Shutdown).into_future(),
-            Ok(Either::B(Either::A(_))) => Ok(StartApiReturnStatus::Restart).into_future(),
-            Ok(Either::B(_)) => Ok(StartApiReturnStatus::Shutdown).into_future(),
-            Err(Either::A((err, _))) => Err(err).into_future(),
-            Err(Either::B(Either::A(_))) => {
-                debug!("The restart signal failed, shutting down.");
-                Ok(StartApiReturnStatus::Shutdown).into_future()
+            Ok(Either::A(_)) => Ok((StartApiReturnStatus::Shutdown, false)).into_future(),
+            Ok(Either::B(_)) => {
+                debug!("Shutdown with reprovision.");
+                Ok((StartApiReturnStatus::Shutdown, true)).into_future()
             },
+            Err(Either::A((err, _))) => Err(err).into_future(),
             Err(Either::B(_)) => {
                 debug!("The mgmt shutdown signal failed, shutting down.");
-                Ok(StartApiReturnStatus::Shutdown).into_future()
+                Ok((StartApiReturnStatus::Shutdown, false)).into_future()
+            }
+        }
+    });
+
+    let edge_rt_with_cleanup = k.select2(restart_rx).then(move |res| {
+        mgmt_tx.send(()).unwrap_or(());
+        work_tx.send(()).unwrap_or(());
+
+        // A -> EdgeRt Future
+        // B -> Restart Signal Future
+        // A -> EdgeRt Future
+        // B -> Restart Signal Future
+        match res {
+            Ok(Either::A((x, _))) => Ok((StartApiReturnStatus::Shutdown, x.1)).into_future(),
+            Ok(Either::B(_)) => Ok((StartApiReturnStatus::Restart, false)).into_future(),
+            Err(Either::A((err, _))) => Err(err).into_future(),
+            Err(Either::B(_)) => {
+                debug!("The restart signal failed, shutting down.");
+                Ok((StartApiReturnStatus::Shutdown, false)).into_future()
             }
         }
     });
@@ -1528,10 +1541,21 @@ where
     let services = mgmt
         .join4(workload, edge_rt_with_cleanup, expiration_timer)
         .then(|result| match result {
-            Ok(((), (), code, ())) => Ok(code),
+            Ok(((), (), (code, should_reprovision), ())) => Ok((code, should_reprovision)),
             Err(err) => Err(err),
         });
-    let restart_code = tokio_runtime.block_on(services)?;
+    let (restart_code, should_reprovision) = tokio_runtime.block_on(services)?;
+
+    if should_reprovision
+    {
+        let reprovision_fut = provisioning.reprovision().map_err(|err| {
+            return Error::from(err.context(ErrorKind::Initialize(
+                InitializeErrorReason::InvalidHubConfig,
+            )))
+        });
+
+        tokio_runtime.block_on(reprovision_fut)?;
+    }
 
     Ok(restart_code)
 }
@@ -1947,19 +1971,18 @@ where
     env
 }
 
-fn start_management<C, K, HC, M, P>(
+fn start_management<C, K, HC, M,>(
     settings: &M::Settings,
     runtime: &M::ModuleRuntime,
     id_man: &HubIdentityManager<DerivedKeyStore<K>, HC, K>,
     shutdown: Receiver<()>,
     cert_manager: Arc<CertificateManager<C>>,
-    initiate_shutdown: Sender<()>,
+    initiate_shutdown: mpsc::UnboundedSender<()>,
 ) -> impl Future<Item = (), Error = Error>
 where
     C: CreateCertificate + Clone,
     K: 'static + Sign + Clone + Send + Sync,
     HC: 'static + ClientImpl + Send + Sync,
-    P: Provision + Clone + Send + Sync + 'static,
     M: MakeModuleRuntime,
     M::ModuleRuntime: Authenticator<Request = Request<Body>> + Send + Sync + Clone + 'static,
     <<M::ModuleRuntime as Authenticator>::AuthenticateFuture as Future>::Error: Fail,

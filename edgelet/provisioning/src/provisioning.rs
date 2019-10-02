@@ -230,7 +230,7 @@ pub trait Provision {
     ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send>;
 
     fn reprovision(
-        self,
+        &self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send>;
 }
 
@@ -282,7 +282,7 @@ impl Provision for ManualProvisioning {
     }
 
     fn reprovision(
-        self,
+        &self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         Box::new(future::ok(()))
     }
@@ -473,7 +473,7 @@ where
     }
 
     fn reprovision(
-        self,
+        &self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         let result = self
             .client
@@ -598,7 +598,7 @@ where
     }
 
     fn reprovision(
-        self,
+        &self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
@@ -688,7 +688,7 @@ where
     }
 
     fn reprovision(
-        self,
+        &self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
@@ -780,7 +780,7 @@ where
     }
 
     fn reprovision(
-        self,
+        &self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
@@ -913,7 +913,7 @@ where
     }
 
     fn reprovision(
-        self,
+        &self,
     ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         panic!("A reprovisioning operation is not expected for `BackupProvisioning`")
     }
