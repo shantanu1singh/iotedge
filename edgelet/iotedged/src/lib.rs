@@ -1498,6 +1498,7 @@ where
     let k = edge_rt.select2(mgmt_stop_signaled).then(|res| {
         // A -> EdgeRt Future
         // B -> Restart Signal Future
+        info!("Entered first select.");
         match res {
             Ok(Either::A(_)) => Ok((StartApiReturnStatus::Shutdown, false)).into_future(),
             Ok(Either::B(_)) => {
@@ -1513,6 +1514,7 @@ where
     });
 
     let edge_rt_with_cleanup = k.select2(restart_rx).then(move |res| {
+        info!("Entered second select.");
         mgmt_tx.send(()).unwrap_or(());
         work_tx.send(()).unwrap_or(());
 
@@ -1546,6 +1548,8 @@ where
         });
     let (restart_code, should_reprovision) = tokio_runtime.block_on(services)?;
 
+    info!("should reprovision: {}", should_reprovision);
+//    info!("start api code: {}", restart_code);
     if should_reprovision
     {
         let reprovision_fut = provisioning.reprovision().map_err(|err| {
