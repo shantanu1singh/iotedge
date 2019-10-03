@@ -1493,32 +1493,39 @@ where
             info!("Mgmt indicated shut down.");
             match res {
                 Ok(_) => Err(None),
-                Err(e) => Err(Some(e)),
+                Err(_) => Err(Some(Error::from(ErrorKind::ManagementService))),
             }
         })
         .for_each(move |_x: Option<Error>| {
             info!("Mgmt indicated shut down for each.");
+
             Ok(())
     })
-        .map_err(|e| if let None = e {
-    debug!("known error");
-});
-//    tokio_runtime.spawn(mgmt_stop_signaled);
+        .then(|res| {
+            match res {
+                Ok(_) => Ok(None),
+                Err(None) => Ok(None),
+                Err(Some(e)) => Err(Some(e)),
+            }
+        }
+    );
 
-    let k = edge_rt.select2(mgmt_stop_signaled).then(|res| {
+    let k = edge_rt.select2(mgmt_stop_signaled).then(|res: Result<Either<((), _), (Option<Error>, _)>, Either<(Error, _), (Option<Error>, _)>>| {
+
         // A -> EdgeRt Future
         // B -> Restart Signal Future
         info!("Entered first select.");
         match res {
-            Ok(Either::A(_)) => Ok((StartApiReturnStatus::Shutdown, false)).into_future(),
-            Ok(Either::B(_)) => {
+            Ok(Either::A((_x, _y))) => Ok((StartApiReturnStatus::Shutdown, false)).into_future(),
+            Ok(Either::B((_x, _y))) => {
                 debug!("Shutdown with reprovision.");
                 Ok((StartApiReturnStatus::Shutdown, true)).into_future()
             },
-            Err(Either::A((err, _))) => Err(err).into_future(),
-            Err(Either::B(_)) => {
+            Err(Either::A((err, _y))) => Err(err).into_future(),
+            Err(Either::B((err, _y))) => {
                 debug!("The mgmt shutdown signal failed, shutting down.");
-                Ok((StartApiReturnStatus::Shutdown, false)).into_future()
+//                Ok((StartApiReturnStatus::Shutdown, false)).into_future()
+                Err(err.unwrap()).into_future()
             }
         }
     });
