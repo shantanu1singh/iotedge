@@ -1498,7 +1498,6 @@ where
         })
         .for_each(move |_x: Option<Error>| {
             info!("Mgmt indicated shut down for each.");
-
             Ok(())
     })
         .then(|res| {
@@ -1511,7 +1510,6 @@ where
     );
 
     let k = edge_rt.select2(mgmt_stop_signaled).then(|res: Result<Either<((), _), (Option<Error>, _)>, Either<(Error, _), (Option<Error>, _)>>| {
-
         // A -> EdgeRt Future
         // B -> Restart Signal Future
         info!("Entered first select.");
@@ -1523,8 +1521,7 @@ where
             },
             Err(Either::A((err, _y))) => Err(err).into_future(),
             Err(Either::B((err, _y))) => {
-                debug!("The mgmt shutdown signal failed, shutting down.");
-//                Ok((StartApiReturnStatus::Shutdown, false)).into_future()
+                debug!("The mgmt shutdown signal failed,  down.");
                 Err(err.unwrap()).into_future()
             }
         }

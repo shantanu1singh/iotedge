@@ -109,6 +109,8 @@ impl ExternalProvisioningInterface for ExternalProvisioningClient {
 
 #[cfg(test)]
 mod tests {
+    use std::mem::discriminant;
+
     use super::*;
     use external_provisioning::apis::ApiError as ExternalProvisioningApiError;
     use external_provisioning::apis::Error as ExternalProvisioningError;
@@ -227,22 +229,7 @@ mod tests {
             client: Arc::new(external_provisioning_api),
         };
 
-        let res = client
-            .get_device_provisioning_information()
-            .then(|result| match result {
-                Ok(_) => panic!("Expected a failure."),
-                Err(err) => match err.kind() {
-                    ErrorKind::GetDeviceProvisioningInformation => Ok::<_, Error>(()),
-                    _ => panic!(
-                        "Expected `GetDeviceProvisioningInformation` but got {:?}",
-                        err
-                    ),
-                },
-            })
-            .wait()
-            .is_ok();
-
-        assert!(res);
+        provisioning_info_test_assert(Some(ErrorKind::GetDeviceProvisioningInformation), move || client.get_device_provisioning_information().then(|result| result).wait());
     }
 
     #[test]
@@ -252,9 +239,63 @@ mod tests {
             client: Arc::new(external_provisioning_api),
         };
 
-        let res = client
-            .get_device_provisioning_information()
-            .then(|result| match result {
+        provisioning_info_test_assert(None, move || client.get_device_provisioning_information().then(|result| result).wait());
+    }
+
+    #[test]
+    fn reprovision_device_error() {
+        let external_provisioning_error =
+            TestExternalProvisioningApiError(ExternalProvisioningApiError {
+                code: hyper::StatusCode::from_u16(400).unwrap(),
+                content: None,
+            });
+        let external_provisioning_api = TestExternalProvisioningApi {
+            error: Some(external_provisioning_error),
+        };
+        let client = ExternalProvisioningClient {
+            client: Arc::new(external_provisioning_api),
+        };
+
+        provisioning_info_test_assert(Some(ErrorKind::ReprovisionDevice), move || client.reprovision_device().then(|result| result).wait());
+    }
+
+    #[test]
+    fn reprovision_device_success() {
+        let external_provisioning_api = TestExternalProvisioningApi { error: None };
+        let client = ExternalProvisioningClient {
+            client: Arc::new(external_provisioning_api),
+        };
+
+        provisioning_info_test_assert(None, move || client.reprovision_device().then(|result| result).wait());
+    }
+
+    pub fn provisioning_info_test_assert<F>(
+        error_kind: Option<ErrorKind>,
+        executor: F,
+    )where
+            F: FnOnce() -> Result<DeviceProvisioningInfo, Error> + Sync + Send + 'static,
+    {
+        let result = executor();
+        let res = if let Some(error_kind_val) = error_kind {
+            match result {
+                Ok(_) => panic!("Expected a failure."),
+                Err(err) =>
+                if discriminant(err.kind()) == discriminant(&error_kind_val)
+                {
+                    Ok::<_, Error>(())
+                }
+                else{
+                    panic!(
+                        "Expected `{}` but got {:?}",
+                        error_kind_val,
+                        err
+                    )
+                }
+            }
+                .is_ok()
+        }
+        else{
+            match result {
                 Ok(item) => {
                     assert_eq!("TestHub", item.hub_name());
                     assert_eq!("TestDevice", item.device_id());
@@ -270,9 +311,9 @@ mod tests {
                     Ok::<_, Error>(())
                 }
                 Err(_err) => panic!("Did not expect a failure."),
-            })
-            .wait()
-            .is_ok();
+            }
+                .is_ok()
+        };
 
         assert!(res);
     }

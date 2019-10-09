@@ -1,83 +1,28 @@
 // Copyright (c) Microsoft. All rights reserved.
 
-//use std::sync::Arc;
-//use std::sync::Mutex;
 use failure::ResultExt;
-//use futures::Future;
 use futures::{Future, IntoFuture};
 use hyper::{Body, Request, Response, StatusCode};
 use log::debug;
 
 use edgelet_http::route::{Handler, Parameters};
 use edgelet_http::Error as HttpError;
-//use provisioning::provisioning::{Provision};
-//use futures::sync::oneshot::{Sender};
-//use std::sync::mpsc::{Sender};
-//use futures::sync::mpsc::{Sender};
 use futures::sync::mpsc::{UnboundedSender};
 
 use crate::error::{Error, ErrorKind};
 use crate::IntoResponse;
-//use futures::sink::Sink;
-//use crate::IntoResponse;
-
-//pub struct ReprovisionDevice<P> {
-//    provision: P,
-//}
-//
-//impl<P> ReprovisionDevice<P> {
-//    pub fn new(provision: P) -> Self {
-//        ReprovisionDevice { provision }
-//    }
-//}
-//
-//impl<P> Handler<Parameters> for ReprovisionDevice<P>
-//where
-//    P: 'static + Clone + Provision + Send + Sync,
-//{
-//    fn handle(
-//        &self,
-//        _req: Request<Body>,
-//        _params: Parameters,
-//    ) -> Box<dyn Future<Item = Response<Body>, Error = HttpError> + Send> {
-//        debug!("Reprovision Device");
-//        let provision = self.provision.clone();
-//
-//        let response = provision
-//            .reprovision()
-//            .then(|_| -> Result<_, Error> {
-//                let response = Response::builder()
-//                    .status(StatusCode::OK)
-//                    .body(Body::default())
-//                    .context(ErrorKind::ReprovisionDevice)?;
-//                Ok(response)
-//            })
-//            .or_else(|e| Ok(e.into_response()));
-//
-//        Box::new(response)
-//    }
-//}
 
 pub struct ReprovisionDevice {
-//    initiate_shutdown: Arc<Sender<()>>,
-//    initiate_shutdown: Sender<()>,
-initiate_shutdown: UnboundedSender<()>,
-//    initiate_shutdown: Mutex<Sender<()>>,
+    initiate_shutdown: UnboundedSender<()>,
 }
 
 impl ReprovisionDevice {
-//    pub fn new(initiate_shutdown: Sender<()>,) -> Self {
         pub fn new(initiate_shutdown: UnboundedSender<()>,) -> Self {
-//        pub fn new(initiate_shutdown: Mutex<Sender<()>>,) -> Self {
-//        ReprovisionDevice { initiate_shutdown: Arc::new(initiate_shutdown) }
-//        ReprovisionDevice { initiate_shutdown }
         ReprovisionDevice { initiate_shutdown }
     }
 }
 
 impl Handler<Parameters> for ReprovisionDevice
-//    where
-//        P: 'static + Clone + Provision + Send + Sync,
 {
     fn handle(
         &self,
@@ -85,10 +30,7 @@ impl Handler<Parameters> for ReprovisionDevice
         _params: Parameters,
     ) -> Box<dyn Future<Item = Response<Body>, Error = HttpError> + Send> {
         debug!("Reprovision Device");
-//        let provision = self.provision.clone();
-
         let response = self.initiate_shutdown.unbounded_send(())
-//        let response = self.initiate_shutdown.lock().unwrap().send()
             .map_err(|_| Error::from(ErrorKind::ReprovisionDevice))
             .and_then(|_| -> Result<_, Error> {
                 let response = Response::builder()
@@ -99,7 +41,6 @@ impl Handler<Parameters> for ReprovisionDevice
                 Ok(response)
             })
             .or_else(|e| Ok(e.into_response()))
-//            .or_else(|e| Ok(Error::from(ErrorKind::ReprovisionDevice).into_response()))
             .into_future();
 
         Box::new(response)
