@@ -43,7 +43,7 @@ impl ManagementService {
     pub fn new<M, I>(
         runtime: &M,
         identity: &I,
-        initiate_shutdown: UnboundedSender<()>,
+        initiate_shutdown_and_reprovision: UnboundedSender<()>,
     ) -> impl Future<Item = Self, Error = Error>
     where
         M: ModuleRuntime + Authenticator<Request = Request<Body>> + Clone + Send + Sync + 'static,
@@ -73,7 +73,7 @@ impl ManagementService {
 
             get     Version2018_06_28 runtime Policy::Anonymous             => "/systeminfo"                        => GetSystemInfo::new(runtime.clone()),
 
-            post    Version2019_01_30 runtime Policy::Module(&*AGENT_NAME)  => "/device/reprovision"                => ReprovisionDevice::new(initiate_shutdown),
+            post    Version2019_01_30 runtime Policy::Module(&*AGENT_NAME)  => "/device/reprovision"                => ReprovisionDevice::new(initiate_shutdown_and_reprovision),
         );
 
         router.new_service().then(|inner| {
