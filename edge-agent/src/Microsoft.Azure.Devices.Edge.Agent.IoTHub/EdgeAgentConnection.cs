@@ -142,11 +142,13 @@ namespace Microsoft.Azure.Devices.Edge.Agent.IoTHub
             {
                 Events.ConnectionStatusChanged(status, reason);
 
-                // Change this to Device_Not_Found after that reason is added to the C# IoT SDK.
-                if (reason == ConnectionStatusChangeReason.Communication_Error)
-                {
-                    await this.deviceManager.ReprovisionDeviceAsync();
-                }
+                // TODO: Change this to `Device_Not_Found` after that reason is added to the C# IoT SDK
+                // and uncomment the following block to enable dynamic reprovisioning based on the
+                // new ConnectionStatusChangeReason.
+                //if (reason == ConnectionStatusChangeReason.Communication_Error)
+                //{
+                //    await this.deviceManager.ReprovisionDeviceAsync();
+                //}
 
                 if (this.pullOnReconnect && this.initTask.IsCompleted && status == ConnectionStatus.Connected)
                 {

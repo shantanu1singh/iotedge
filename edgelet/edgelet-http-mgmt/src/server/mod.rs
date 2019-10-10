@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 
 use failure::{Compat, Fail, ResultExt};
+use futures::sync::mpsc::UnboundedSender;
 use futures::{future, Future};
-use futures::sync::mpsc::{UnboundedSender};
 
 use hyper::service::{NewService, Service};
 use hyper::{Body, Request};
@@ -19,15 +19,15 @@ use edgelet_http::route::*;
 use edgelet_http::router;
 use edgelet_http::Version;
 
+mod device_actions;
 mod identity;
 mod module;
 mod system_info;
-mod device_actions;
 
+use self::device_actions::*;
 use self::identity::*;
 pub use self::module::*;
 use self::system_info::*;
-use self::device_actions::*;
 use crate::error::{Error, ErrorKind};
 
 lazy_static! {
@@ -40,7 +40,11 @@ pub struct ManagementService {
 }
 
 impl ManagementService {
-    pub fn new<M, I>(runtime: &M, identity: &I, initiate_shutdown: UnboundedSender<()>,) -> impl Future<Item = Self, Error = Error>
+    pub fn new<M, I>(
+        runtime: &M,
+        identity: &I,
+        initiate_shutdown: UnboundedSender<()>,
+    ) -> impl Future<Item = Self, Error = Error>
     where
         M: ModuleRuntime + Authenticator<Request = Request<Body>> + Clone + Send + Sync + 'static,
         for<'r> &'r <M as ModuleRuntime>::Error: Into<ModuleRuntimeErrorReason>,

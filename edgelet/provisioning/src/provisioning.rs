@@ -229,9 +229,7 @@ pub trait Provision {
         key_activator: Self::Hsm,
     ) -> Box<dyn Future<Item = ProvisioningResult, Error = Error> + Send>;
 
-    fn reprovision(
-        &self,
-    ) -> Box<dyn Future<Item = (), Error = Error> + Send>;
+    fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send>;
 }
 
 #[derive(Clone, Debug)]
@@ -281,9 +279,7 @@ impl Provision for ManualProvisioning {
         Box::new(result.into_future())
     }
 
-    fn reprovision(
-        &self,
-    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+    fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         Box::new(future::ok(()))
     }
 }
@@ -427,11 +423,11 @@ where
             .and_then(move |device_provisioning_info| {
                 let provisioning_status = device_provisioning_info.status().map_or_else(
                     || ProvisioningStatus::Assigned,
-                    |s| ProvisioningStatus::from(s.as_ref()),
+                    ProvisioningStatus::from,
                 );
                 let reconfigure = device_provisioning_info.substatus().map_or_else(
                     || ReprovisioningStatus::InitialAssignment,
-                    |s| ReprovisioningStatus::from(s.as_ref()),
+                    ReprovisioningStatus::from,
                 );
                 info!(
                     "External device registration information: Device \"{}\" in hub \"{}\" with credential type \"{}\" and credential source \"{}\". Current status is \"{}\" with substatus \"{}\".",
@@ -472,9 +468,7 @@ where
         Box::new(result)
     }
 
-    fn reprovision(
-        &self,
-    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+    fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         let result = self
             .client
             .reprovision_device()
@@ -482,11 +476,11 @@ where
             .and_then(move |device_provisioning_info| {
                 let provisioning_status = device_provisioning_info.status().map_or_else(
                     || ProvisioningStatus::Assigned,
-                    |s| ProvisioningStatus::from(s.as_ref()),
+                    ProvisioningStatus::from,
                 );
                 let reconfigure = device_provisioning_info.substatus().map_or_else(
                     || ReprovisioningStatus::InitialAssignment,
-                    |s| ReprovisioningStatus::from(s.as_ref()),
+                    ReprovisioningStatus::from,
                 );
                 info!(
                     "External device registration information after reprovisioning: Device \"{}\" in hub \"{}\" with credential type \"{}\" and credential source \"{}\". Current status is \"{}\" with substatus \"{}\".",
@@ -597,9 +591,7 @@ where
         Box::new(d)
     }
 
-    fn reprovision(
-        &self,
-    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+    fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
     }
@@ -687,9 +679,7 @@ where
         Box::new(d)
     }
 
-    fn reprovision(
-        &self,
-    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+    fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
     }
@@ -779,9 +769,7 @@ where
         Box::new(d)
     }
 
-    fn reprovision(
-        &self,
-    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+    fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         // TODO: Implement reprovisioning flow for DPS.
         Box::new(future::ok(()))
     }
@@ -912,9 +900,7 @@ where
         )
     }
 
-    fn reprovision(
-        &self,
-    ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+    fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
         panic!("A reprovisioning operation is not expected for `BackupProvisioning`")
     }
 }
@@ -950,9 +936,7 @@ mod tests {
             }))
         }
 
-        fn reprovision(
-            &self,
-        ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
             Box::new(future::ok(()))
         }
     }
@@ -975,9 +959,7 @@ mod tests {
             }))
         }
 
-        fn reprovision(
-            &self,
-        ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
             Box::new(future::ok(()))
         }
     }
@@ -994,9 +976,7 @@ mod tests {
             Box::new(future::err(Error::from(ErrorKind::Provision)))
         }
 
-        fn reprovision(
-            &self,
-        ) -> Box<dyn Future<Item = (), Error = Error> + Send> {
+        fn reprovision(&self) -> Box<dyn Future<Item = (), Error = Error> + Send> {
             Box::new(future::err(Error::from(ErrorKind::Reprovision)))
         }
     }
@@ -1736,10 +1716,11 @@ mod tests {
         provisioning_info.set_status("assigned".to_string());
         provisioning_info.set_substatus("initialAssignment".to_string());
 
-        let provisioning: ExternalProvisioning<_, MemoryKeyStore> = ExternalProvisioning::new(TestExternalProvisioningInterface {
-            error: None,
-            provisioning_info,
-        });
+        let provisioning: ExternalProvisioning<_, MemoryKeyStore> =
+            ExternalProvisioning::new(TestExternalProvisioningInterface {
+                error: None,
+                provisioning_info,
+            });
 
         let task = provisioning.reprovision();
         tokio::runtime::current_thread::Runtime::new()
@@ -1761,10 +1742,11 @@ mod tests {
         provisioning_info.set_status("assigned".to_string());
         provisioning_info.set_substatus("initialAssignment".to_string());
 
-        let provisioning: ExternalProvisioning<_, MemoryKeyStore> = ExternalProvisioning::new(TestExternalProvisioningInterface {
-            error: Some(TestError {}),
-            provisioning_info,
-        });
+        let provisioning: ExternalProvisioning<_, MemoryKeyStore> =
+            ExternalProvisioning::new(TestExternalProvisioningInterface {
+                error: Some(TestError {}),
+                provisioning_info,
+            });
 
         let task = provisioning.reprovision().then(|result| {
             assert_eq!(

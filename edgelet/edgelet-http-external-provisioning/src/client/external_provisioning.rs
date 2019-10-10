@@ -98,10 +98,7 @@ impl ExternalProvisioningInterface for ExternalProvisioningClient {
             .get_api()
             .reprovision_device(crate::EXTERNAL_PROVISIONING_API_VERSION)
             .map_err(|err| {
-                Error::from_external_provisioning_error(
-                    err,
-                    ErrorKind::ReprovisionDevice,
-                )
+                Error::from_external_provisioning_error(err, ErrorKind::ReprovisionDevice)
             });
         Box::new(connection_info)
     }
@@ -193,9 +190,9 @@ mod tests {
             _api_version: &str,
         ) -> Box<
             dyn Future<
-                Item = external_provisioning::models::DeviceProvisioningInfo,
-                Error = ExternalProvisioningError<serde_json::Value>,
-            > + Send,
+                    Item = external_provisioning::models::DeviceProvisioningInfo,
+                    Error = ExternalProvisioningError<serde_json::Value>,
+                > + Send,
         > {
             match self.error.as_ref() {
                 None => {
@@ -229,7 +226,15 @@ mod tests {
             client: Arc::new(external_provisioning_api),
         };
 
-        provisioning_info_test_assert(Some(ErrorKind::GetDeviceProvisioningInformation), move || client.get_device_provisioning_information().then(|result| result).wait());
+        provisioning_info_test_assert(
+            Some(ErrorKind::GetDeviceProvisioningInformation),
+            move || {
+                client
+                    .get_device_provisioning_information()
+                    .then(|result| result)
+                    .wait()
+            },
+        );
     }
 
     #[test]
@@ -239,7 +244,12 @@ mod tests {
             client: Arc::new(external_provisioning_api),
         };
 
-        provisioning_info_test_assert(None, move || client.get_device_provisioning_information().then(|result| result).wait());
+        provisioning_info_test_assert(None, move || {
+            client
+                .get_device_provisioning_information()
+                .then(|result| result)
+                .wait()
+        });
     }
 
     #[test]
@@ -256,7 +266,9 @@ mod tests {
             client: Arc::new(external_provisioning_api),
         };
 
-        provisioning_info_test_assert(Some(ErrorKind::ReprovisionDevice), move || client.reprovision_device().then(|result| result).wait());
+        provisioning_info_test_assert(Some(ErrorKind::ReprovisionDevice), move || {
+            client.reprovision_device().then(|result| result).wait()
+        });
     }
 
     #[test]
@@ -266,35 +278,29 @@ mod tests {
             client: Arc::new(external_provisioning_api),
         };
 
-        provisioning_info_test_assert(None, move || client.reprovision_device().then(|result| result).wait());
+        provisioning_info_test_assert(None, move || {
+            client.reprovision_device().then(|result| result).wait()
+        });
     }
 
-    pub fn provisioning_info_test_assert<F>(
-        error_kind: Option<ErrorKind>,
-        executor: F,
-    )where
-            F: FnOnce() -> Result<DeviceProvisioningInfo, Error> + Sync + Send + 'static,
+    pub fn provisioning_info_test_assert<F>(error_kind: Option<ErrorKind>, executor: F)
+    where
+        F: FnOnce() -> Result<DeviceProvisioningInfo, Error> + Sync + Send + 'static,
     {
         let result = executor();
         let res = if let Some(error_kind_val) = error_kind {
             match result {
                 Ok(_) => panic!("Expected a failure."),
-                Err(err) =>
-                if discriminant(err.kind()) == discriminant(&error_kind_val)
-                {
-                    Ok::<_, Error>(())
-                }
-                else{
-                    panic!(
-                        "Expected `{}` but got {:?}",
-                        error_kind_val,
-                        err
-                    )
+                Err(err) => {
+                    if discriminant(err.kind()) == discriminant(&error_kind_val) {
+                        Ok::<_, Error>(())
+                    } else {
+                        panic!("Expected `{}` but got {:?}", error_kind_val, err)
+                    }
                 }
             }
-                .is_ok()
-        }
-        else{
+            .is_ok()
+        } else {
             match result {
                 Ok(item) => {
                     assert_eq!("TestHub", item.hub_name());
@@ -312,7 +318,7 @@ mod tests {
                 }
                 Err(_err) => panic!("Did not expect a failure."),
             }
-                .is_ok()
+            .is_ok()
         };
 
         assert!(res);

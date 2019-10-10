@@ -21,6 +21,7 @@ pub mod unix;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+use futures::sync::mpsc;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -28,7 +29,6 @@ use std::fs::{DirBuilder, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use futures::sync::mpsc;
 
 use failure::{Context, Fail, ResultExt};
 use futures::future::{Either, IntoFuture};
@@ -52,10 +52,10 @@ use edgelet_core::crypto::{
 use edgelet_core::watchdog::Watchdog;
 use edgelet_core::{
     AttestationMethod, Authenticator, Certificate, CertificateIssuer, CertificateProperties,
-    CertificateType, Dps, MakeModuleRuntime, ManualAuthMethod,
-    Module, ModuleRuntime, ModuleRuntimeErrorReason,
-    ModuleSpec, Provisioning, ProvisioningResult as CoreProvisioningResult, RuntimeSettings,
-    SymmetricKeyAttestationInfo, TpmAttestationInfo, WorkloadConfig,
+    CertificateType, Dps, MakeModuleRuntime, ManualAuthMethod, Module, ModuleRuntime,
+    ModuleRuntimeErrorReason, ModuleSpec, Provisioning,
+    ProvisioningResult as CoreProvisioningResult, RuntimeSettings, SymmetricKeyAttestationInfo,
+    TpmAttestationInfo, WorkloadConfig,
 };
 use edgelet_hsm::tpm::{TpmKey, TpmKeyStore};
 use edgelet_hsm::{Crypto, HsmLock, X509};
@@ -536,16 +536,13 @@ where
                 match dps.attestation() {
                     AttestationMethod::Tpm(ref tpm) => {
                         info!("Starting provisioning edge device via TPM...");
-                        let (tpm_instance, dps_tpm) = dps_tpm_provision_init(
-                            &dps,
-                            hyper_client.clone(),
-                            tpm,
-                        )?;
+                        let (tpm_instance, dps_tpm) =
+                            dps_tpm_provision_init(&dps, hyper_client.clone(), tpm)?;
                         let (key_store, provisioning_result, root_key) = dps_tpm_provision(
                             dps_path,
                             &mut tokio_runtime,
                             hsm_lock.clone(),
-tpm_instance,
+                            tpm_instance,
                             dps_tpm.clone(),
                         )?;
 
@@ -615,9 +612,9 @@ tpm_instance,
                             reg_id,
                             DPS_API_VERSION.to_string(),
                         )
-                            .context(ErrorKind::Initialize(
-                                InitializeErrorReason::DpsProvisioningClient,
-                            ))?;
+                        .context(ErrorKind::Initialize(
+                            InitializeErrorReason::DpsProvisioningClient,
+                        ))?;
 
                         let (key_store, provisioning_result, root_key) = dps_x509_provision(
                             memory_hsm,
@@ -645,10 +642,15 @@ tpm_instance,
     }
 }
 
+type ExternalProvisioningInfo = (
+        Option<ProvisioningResult>,
+        Option<ExternalProvisioning<ExternalProvisioningClient, MemoryKeyStore>>,
+    );
+
 fn get_external_provisioning_info<S>(
     settings: &S,
     tokio_runtime: &mut tokio::runtime::Runtime,
-) -> Result<(Option<ProvisioningResult>, Option<ExternalProvisioning<ExternalProvisioningClient, MemoryKeyStore>>), Error>
+) -> Result<ExternalProvisioningInfo, Error>
 where
     S: RuntimeSettings,
 {
@@ -1469,8 +1471,14 @@ where
 
     let cert_manager = Arc::new(cert_manager);
 
-    let mgmt =
-        start_management::<_, _, _, M>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone(), mgmt_stop_tx);
+    let mgmt = start_management::<_, _, _, M>(
+        settings,
+        runtime,
+        &id_man,
+        mgmt_rx,
+        cert_manager.clone(),
+        mgmt_stop_tx,
+    );
 
     let workload = start_workload::<_, _, _, _, M>(
         settings,
@@ -1496,42 +1504,43 @@ where
     // This way the edgeAgent can finish shutting down all modules.
     let mgmt_stop_signaled = mgmt_stop_rx
         .then(|res| {
-        info!("Mgmt indicated shut down.");
-        match res {
-            Ok(_) => Err(None),
-            Err(_) => Err(Some(Error::from(ErrorKind::ManagementService))),
-        }
-    })
+            info!("Mgmt indicated shut down.");
+            match res {
+                Ok(_) => Err(None),
+                Err(_) => Err(Some(Error::from(ErrorKind::ManagementService))),
+            }
+        })
         .for_each(move |_x: Option<Error>| {
             info!("Mgmt indicated shut down for each.");
             Ok(())
-    })
-        .then(|res| {
-            match res {
-                Ok(_) => Ok(None),
-                Err(None) => Ok(None),
-                Err(Some(e)) => Err(Some(e)),
-            }
-        }
-    );
+        })
+        .then(|res| match res {
+            Ok(_) | Err(None) => Ok(None),
+            Err(Some(e)) => Err(Some(e)),
+        });
 
-    let k = edge_rt.select2(mgmt_stop_signaled).then(|res: Result<Either<((), _), (Option<Error>, _)>, Either<(Error, _), (Option<Error>, _)>>| {
-        // A -> EdgeRt Future
-        // B -> Restart Signal Future
-        info!("Entered first select.");
-        match res {
-            Ok(Either::A((_x, _y))) => Ok((StartApiReturnStatus::Shutdown, false)).into_future(),
-            Ok(Either::B((_x, _y))) => {
-                debug!("Shutdown with reprovision.");
-                Ok((StartApiReturnStatus::Shutdown, true)).into_future()
-            },
-            Err(Either::A((err, _y))) => Err(err).into_future(),
-            Err(Either::B((err, _y))) => {
-                debug!("The mgmt shutdown signal failed,  down.");
-                Err(err.unwrap()).into_future()
+    #[allow(clippy::type_complexity)]
+    let k = edge_rt.select2(mgmt_stop_signaled).then(
+        |res: Result<Either<((), _), (Option<Error>, _)>, Either<(Error, _), (Option<Error>, _)>>| {
+            // A -> EdgeRt Future
+            // B -> Restart Signal Future
+            info!("Entered first select.");
+            match res {
+                Ok(Either::A((_x, _y))) => {
+                    Ok((StartApiReturnStatus::Shutdown, false)).into_future()
+                }
+                Ok(Either::B((_x, _y))) => {
+                    debug!("Shutdown with reprovision.");
+                    Ok((StartApiReturnStatus::Shutdown, true)).into_future()
+                }
+                Err(Either::A((err, _y))) => Err(err).into_future(),
+                Err(Either::B((err, _y))) => {
+                    debug!("The mgmt shutdown signal failed,  down.");
+                    Err(err.unwrap()).into_future()
+                }
             }
-        }
-    });
+        },
+    );
 
     let edge_rt_with_cleanup = k.select2(restart_rx).then(move |res| {
         info!("Entered second select.");
@@ -1569,7 +1578,7 @@ where
     let (restart_code, should_reprovision) = tokio_runtime.block_on(services)?;
 
     info!("should reprovision: {}", should_reprovision);
-//    info!("start api code: {}", restart_code);
+    //    info!("start api code: {}", restart_code);
 
     Ok((restart_code, should_reprovision))
 }
@@ -1655,8 +1664,8 @@ fn dps_x509_provision<HC>(
     tokio_runtime: &mut tokio::runtime::Runtime,
     cert_thumbprint: String,
 ) -> Result<(DerivedKeyStore<MemoryKey>, ProvisioningResult, MemoryKey), Error>
-    where
-        HC: 'static + ClientImpl,
+where
+    HC: 'static + ClientImpl,
 {
     let provision_with_file_backup = BackupProvisioning::new(dps, backup_path);
 
@@ -1770,8 +1779,8 @@ fn dps_symmetric_key_provision_init<HC>(
     hyper_client: HC,
     key: &SymmetricKeyAttestationInfo,
 ) -> Result<(MemoryKeyStore, DpsSymmetricKeyProvisioning<HC>), Error>
-    where
-        HC: 'static + ClientImpl,
+where
+    HC: 'static + ClientImpl,
 {
     let mut memory_hsm = MemoryKeyStore::new();
     let key_bytes =
@@ -1788,9 +1797,9 @@ fn dps_symmetric_key_provision_init<HC>(
         key.registration_id().to_string(),
         DPS_API_VERSION.to_string(),
     )
-        .context(ErrorKind::Initialize(
-            InitializeErrorReason::DpsProvisioningClient,
-        ))?;
+    .context(ErrorKind::Initialize(
+        InitializeErrorReason::DpsProvisioningClient,
+    ))?;
     Ok((memory_hsm, dps))
 }
 
@@ -1830,8 +1839,8 @@ fn dps_tpm_provision_init<HC>(
     hyper_client: HC,
     tpm_attestation_info: &TpmAttestationInfo,
 ) -> Result<(Tpm, DpsTpmProvisioning<HC>), Error>
-    where
-        HC: 'static + ClientImpl,
+where
+    HC: 'static + ClientImpl,
 {
     let tpm = Tpm::new().context(ErrorKind::Initialize(
         InitializeErrorReason::DpsProvisioningClient,
@@ -1866,9 +1875,9 @@ fn dps_tpm_provision_init<HC>(
         ek_result,
         srk_result,
     )
-        .context(ErrorKind::Initialize(
-            InitializeErrorReason::DpsProvisioningClient,
-        ))?;
+    .context(ErrorKind::Initialize(
+        InitializeErrorReason::DpsProvisioningClient,
+    ))?;
     Ok((tpm, dps))
 }
 
@@ -2399,9 +2408,7 @@ mod tests {
         }
     }
 
-    fn settings_first_time_creates_backup(
-    settings_path: &str,
-    ){
+    fn settings_first_time_creates_backup(settings_path: &str) {
         let tmp_dir = TempDir::new("blah").unwrap();
         let settings = Settings::new(Path::new(settings_path)).unwrap();
         let config = DockerConfig::new(
@@ -2409,7 +2416,7 @@ mod tests {
             ContainerCreateBody::new(),
             None,
         )
-            .unwrap();
+        .unwrap();
         let state = ModuleRuntimeState::default();
         let module: TestModule<Error, _> =
             TestModule::new_with_config("test-module".to_string(), config, Ok(state));
@@ -2418,9 +2425,9 @@ mod tests {
             TestProvisioningResult::new(),
             TestHsm::default(),
         )
-            .wait()
-            .unwrap()
-            .with_module(Ok(module));
+        .wait()
+        .unwrap()
+        .with_module(Ok(module));
         let crypto = TestCrypto {
             use_expired_ca: false,
             fail_device_ca_alias: false,
@@ -2437,7 +2444,7 @@ mod tests {
             &mut tokio_runtime,
             None,
         )
-            .unwrap();
+        .unwrap();
         let expected = serde_json::to_string(&settings).unwrap();
         let expected_sha = Sha256::digest_str(&expected);
         let expected_base64 = base64::encode(&expected_sha);
@@ -2474,7 +2481,6 @@ mod tests {
     fn settings_dps_tpm_auth_first_time_creates_backup() {
         settings_first_time_creates_backup(GOOD_SETTINGS_DPS_TPM1);
     }
-
 
     #[test]
     fn settings_external_provisioning_first_time_creates_backup() {

@@ -956,7 +956,7 @@ mod tests {
         match s.provisioning() {
             Provisioning::External(ref external) => {
                 assert_eq!(external.endpoint().as_str(), "http://localhost:9999/");
-                assert_eq!(external.dynamic_reprovisioning(), Some(true));
+                assert_eq!(external.dynamic_reprovisioning(), Some(&true));
             }
             _ => unreachable!(),
         };

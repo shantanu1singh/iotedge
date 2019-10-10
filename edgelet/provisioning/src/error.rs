@@ -76,10 +76,9 @@ impl fmt::Display for ExternalProvisioningErrorReason {
                 "Error occurred while retrieving device provisioning information."
             ),
 
-            ExternalProvisioningErrorReason::ReprovisioningFailure => write!(
-                f,
-                "Error occurred while reprovisioning the device."
-            ),
+            ExternalProvisioningErrorReason::ReprovisioningFailure => {
+                write!(f, "Error occurred while reprovisioning the device.")
+            }
 
             ExternalProvisioningErrorReason::SymmetricKeyNotSpecified => {
                 write!(f, "Symmetric key not specified.")

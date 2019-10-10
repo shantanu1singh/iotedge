@@ -22,10 +22,10 @@ pub struct DeviceProvisioningInfo {
     #[serde(rename = "credentials")]
     credentials: crate::models::Credentials,
     /// The registration/provisioning status of the device in IoT hub.
-    #[serde(rename = "status", skip_serializing_if="Option::is_none")]
+    #[serde(rename = "status", skip_serializing_if = "Option::is_none")]
     status: Option<String>,
     /// The registration/provisioning sub-status of 'assigned' devices in IoT hub.
-    #[serde(rename = "substatus", skip_serializing_if="Option::is_none")]
+    #[serde(rename = "substatus", skip_serializing_if = "Option::is_none")]
     substatus: Option<String>,
 }
 
@@ -40,7 +40,7 @@ impl DeviceProvisioningInfo {
             device_id,
             credentials,
             status: None,
-            substatus: None
+            substatus: None,
         }
     }
 
