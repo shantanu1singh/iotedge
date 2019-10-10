@@ -356,7 +356,7 @@ where
                 // This "do-while" loop runs until a StartApiReturnStatus::Shutdown
                 // is received. If the TLS cert needs a restart, we will loop again.
                 loop {
-                    let code = start_api::<_, _, _, _, _, M, _>(
+                    let (code, should_reprovision) = start_api::<_, _, _, _, _, M>(
                         &settings,
                         hyper_client.clone(),
                         &runtime,
@@ -366,14 +366,22 @@ where
                         make_shutdown_signal(),
                         &crypto,
                         &mut tokio_runtime,
-                        &$provision,
                     )?;
+
+                    if should_reprovision
+                    {
+                        let reprovision = $provision.reprovision().map_err(|err| {
+                            return Error::from(err.context(ErrorKind::Initialize(
+                                InitializeErrorReason::InvalidHubConfig,
+                            )))
+                        });
+
+                        tokio_runtime.block_on(reprovision)?;
+                    }
 
                     if code != StartApiReturnStatus::Restart {
                         break;
                     }
-
-
                 }
             }};
         }
@@ -1377,7 +1385,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn start_api<HC, K, F, C, W, M, P>(
+fn start_api<HC, K, F, C, W, M>(
     settings: &M::Settings,
     hyper_client: HC,
     runtime: &M::ModuleRuntime,
@@ -1387,8 +1395,7 @@ fn start_api<HC, K, F, C, W, M, P>(
     shutdown_signal: F,
     crypto: &C,
     tokio_runtime: &mut tokio::runtime::Runtime,
-    provisioning: &P,
-) -> Result<StartApiReturnStatus, Error>
+) -> Result<(StartApiReturnStatus, bool), Error>
 where
     F: Future<Item = (), Error = ()> + Send + 'static,
     HC: ClientImpl + 'static,
@@ -1403,7 +1410,6 @@ where
         + Sync
         + 'static,
     W: WorkloadConfig + Clone + Send + Sync + 'static,
-    P: Provision + Clone + Send + Sync + 'static,
     M::ModuleRuntime: Authenticator<Request = Request<Body>> + Send + Sync + Clone + 'static,
     M: MakeModuleRuntime + 'static,
     <<M::ModuleRuntime as ModuleRuntime>::Module as Module>::Config:
@@ -1564,18 +1570,8 @@ where
 
     info!("should reprovision: {}", should_reprovision);
 //    info!("start api code: {}", restart_code);
-    if should_reprovision
-    {
-        let reprovision_fut = provisioning.reprovision().map_err(|err| {
-            return Error::from(err.context(ErrorKind::Initialize(
-                InitializeErrorReason::InvalidHubConfig,
-            )))
-        });
 
-        tokio_runtime.block_on(reprovision_fut)?;
-    }
-
-    Ok(restart_code)
+    Ok((restart_code, should_reprovision))
 }
 
 fn init_runtime<M>(
@@ -2140,7 +2136,7 @@ mod tests {
         "../edgelet-docker/test/linux/bad_sample_settings.cs.4.yaml";
     #[cfg(unix)]
     static GOOD_SETTINGS_EXTERNAL: &str =
-        "../edgelet-docker/test/linux/sample_settings.external.yaml";
+        "../edgelet-docker/test/linux/sample_settings.external.1.yaml";
 
     #[cfg(windows)]
     static GOOD_SETTINGS: &str = "../edgelet-docker/test/windows/sample_settings.yaml";
@@ -2163,7 +2159,7 @@ mod tests {
         "../edgelet-docker/test/windows/bad_sample_settings.cs.4.yaml";
     #[cfg(windows)]
     static GOOD_SETTINGS_EXTERNAL: &str =
-        "../edgelet-docker/test/windows/sample_settings.external.yaml";
+        "../edgelet-docker/test/windows/sample_settings.external.1.yaml";
 
     #[derive(Clone, Copy, Debug, Fail)]
     pub struct Error;
