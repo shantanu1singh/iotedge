@@ -26,6 +26,9 @@ pub enum ErrorKind {
 
     #[fail(display = "Could not provision device")]
     Provision,
+
+    #[fail(display = "Could not reprovision device")]
+    Reprovision,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

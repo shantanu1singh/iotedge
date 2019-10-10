@@ -26,10 +26,8 @@ use std::env;
 use std::fs;
 use std::fs::{DirBuilder, File, OpenOptions};
 use std::io::{Read, Write};
-//use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-//use std::sync::mpsc::{ Sender, Receiver };
 use futures::sync::mpsc;
 
 use failure::{Context, Fail, ResultExt};
@@ -1489,13 +1487,13 @@ where
     // Wait for the watchdog to finish, and then send signal to the workload and management services.
     // This way the edgeAgent can finish shutting down all modules.
     let mgmt_stop_signaled = mgmt_stop_rx
-        .then(|res| {
-            info!("Mgmt indicated shut down.");
-            match res {
-                Ok(_) => Err(None),
-                Err(_) => Err(Some(Error::from(ErrorKind::ManagementService))),
-            }
-        })
+        .and_then(|res| {
+        info!("Mgmt indicated shut down.");
+        match res {
+            Ok(_) => Err(None),
+            Err(_) => Err(Some(Error::from(ErrorKind::ManagementService))),
+        }
+    })
         .for_each(move |_x: Option<Error>| {
             info!("Mgmt indicated shut down for each.");
             Ok(())

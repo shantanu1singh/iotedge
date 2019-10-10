@@ -2,6 +2,7 @@
 
 use failure::ResultExt;
 use futures::{Future, IntoFuture};
+use futures::sync::mpsc;
 use hyper::{Body, Request, Response, StatusCode};
 use log::debug;
 
@@ -49,32 +50,37 @@ impl Handler<Parameters> for ReprovisionDevice
 
 #[cfg(test)]
 mod tests {
-    use edgelet_core::{self, MakeModuleRuntime, ModuleRuntimeState};
     use edgelet_http::route::Parameters;
-    use edgelet_test_utils::crypto::TestHsm;
-    use edgelet_test_utils::module::*;
     use futures::Stream;
-    use management::models::SystemInfo;
 
+    use crate::error::{Error, ErrorKind};
     use super::*;
-    use crate::server::module::tests::Error;
 
     #[test]
-    fn system_info_success() {
+    fn reprovision_device_success() {
         // arrange
-        let state = ModuleRuntimeState::default();
-        let config = TestConfig::new("microsoft/test-image".to_string());
-        let module: TestModule<Error, _> =
-            TestModule::new("test-module".to_string(), config, Ok(state));
-        let runtime = TestRuntime::make_runtime(
-            TestSettings::new(),
-            TestProvisioningResult::new(),
-            TestHsm::default(),
-        )
-        .wait()
-        .unwrap()
-        .with_module(Ok(module));
-        let handler = GetSystemInfo::new(runtime);
+        let (mgmt_stop_tx, mgmt_stop_rx) = mpsc::unbounded();
+
+        let receiver_fut = mgmt_stop_rx
+        .then(|res| {
+            match res {
+                Ok(_) => Err(None),
+                Err(_) => Err(Some(Error::from(ErrorKind::ReprovisionDevice))),
+            }
+        })
+            .for_each(move |_x: Option<Error>| {
+                Ok(())
+            })
+            .then(|res| {
+                match res {
+                    Ok(()) => Ok(None as Option<Error>),
+                    Err(None) => Ok(None),
+                    Err(Some(e)) => Err(Some(e)),
+                }
+            }
+            );
+
+        let handler = ReprovisionDevice::new(mgmt_stop_tx);
         let request = Request::get("http://localhost/info")
             .body(Body::default())
             .unwrap();
@@ -83,40 +89,18 @@ mod tests {
         let response = handler.handle(request, Parameters::new()).wait().unwrap();
 
         // assert
-        response
-            .into_body()
-            .concat2()
-            .and_then(|b| {
-                let system_info: SystemInfo = serde_json::from_slice(&b).unwrap();
-                let os_type = system_info.os_type();
-                let architecture = system_info.architecture();
-
-                assert_eq!("os_type_sample", os_type);
-                assert_eq!("architecture_sample", architecture);
-                assert_eq!(
-                    edgelet_core::version_with_source_version(),
-                    system_info.version(),
-                );
-
-                Ok(())
-            })
-            .wait()
-            .unwrap();
+        assert_eq!(StatusCode::OK, response.status());
+        assert!(receiver_fut.wait().ok().unwrap().is_none())
     }
 
     #[test]
-    fn system_info_failed() {
+    fn reprovision_device_failed() {
         // arrange
-        let runtime = TestRuntime::make_runtime(
-            TestSettings::new(),
-            TestProvisioningResult::new(),
-            TestHsm::default(),
-        )
-        .wait()
-        .unwrap()
-        .with_module(Err(Error::General));
-        let handler = GetSystemInfo::new(runtime);
-        let request = Request::get("http://localhost/modules")
+        let (mgmt_stop_tx, mut mgmt_stop_rx) = mpsc::unbounded();
+        mgmt_stop_rx.close();
+
+        let handler = ReprovisionDevice::new(mgmt_stop_tx);
+        let request = Request::get("http://localhost/info")
             .body(Body::default())
             .unwrap();
 
@@ -124,18 +108,6 @@ mod tests {
         let response = handler.handle(request, Parameters::new()).wait().unwrap();
 
         // assert
-        response
-            .into_body()
-            .concat2()
-            .and_then(|b| {
-                let error: ErrorResponse = serde_json::from_slice(&b).unwrap();
-                assert_eq!(
-                    "Could not query system info\n\tcaused by: General error",
-                    error.message()
-                );
-                Ok(())
-            })
-            .wait()
-            .unwrap();
+        assert_eq!(StatusCode::INTERNAL_SERVER_ERROR, response.status());
     }
 }
