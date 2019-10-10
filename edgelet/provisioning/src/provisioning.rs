@@ -505,6 +505,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct DpsTpmProvisioning<C>
 where
     C: ClientImpl,

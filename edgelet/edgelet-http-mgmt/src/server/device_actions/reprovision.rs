@@ -2,7 +2,6 @@
 
 use failure::ResultExt;
 use futures::{Future, IntoFuture};
-use futures::sync::mpsc;
 use hyper::{Body, Request, Response, StatusCode};
 use log::debug;
 
@@ -52,6 +51,7 @@ impl Handler<Parameters> for ReprovisionDevice
 mod tests {
     use edgelet_http::route::Parameters;
     use futures::Stream;
+    use futures::sync::mpsc;
 
     use crate::error::{Error, ErrorKind};
     use super::*;

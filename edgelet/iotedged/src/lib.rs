@@ -372,6 +372,8 @@ where
                     if code != StartApiReturnStatus::Restart {
                         break;
                     }
+
+
                 }
             }};
         }
@@ -1462,7 +1464,7 @@ where
     let cert_manager = Arc::new(cert_manager);
 
     let mgmt =
-        start_management::<_, _, _, M,>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone(), mgmt_stop_tx);
+        start_management::<_, _, _, M>(settings, runtime, &id_man, mgmt_rx, cert_manager.clone(), mgmt_stop_tx);
 
     let workload = start_workload::<_, _, _, _, M>(
         settings,
@@ -1487,7 +1489,7 @@ where
     // Wait for the watchdog to finish, and then send signal to the workload and management services.
     // This way the edgeAgent can finish shutting down all modules.
     let mgmt_stop_signaled = mgmt_stop_rx
-        .and_then(|res| {
+        .then(|res| {
         info!("Mgmt indicated shut down.");
         match res {
             Ok(_) => Err(None),
@@ -1649,28 +1651,6 @@ fn manual_provision_x509(
     tokio_runtime.block_on(provision)
 }
 
-fn prepare_derived_hybrid_key(
-    key_store: &MemoryKeyStore,
-    cert_thumbprint: &str,
-    hub_name: &str,
-    device_id: &str,
-) -> Result<(DerivedKeyStore<MemoryKey>, MemoryKey), Error> {
-    let k = key_store
-        .get(&KeyIdentity::Device, "primary")
-        .context(ErrorKind::Initialize(
-            InitializeErrorReason::HybridAuthKeyGet,
-        ))?;
-    let sign_data = format!("{}/devices/{}/{}", hub_name, device_id, cert_thumbprint);
-    let digest = k
-        .sign(SignatureAlgorithm::HMACSHA256, sign_data.as_bytes())
-        .context(ErrorKind::Initialize(
-            InitializeErrorReason::HybridAuthKeySign,
-        ))?;
-    let hybrid_derived_key = MemoryKey::new(digest.as_bytes());
-    let derived_key_store = DerivedKeyStore::new(hybrid_derived_key.clone());
-    Ok((derived_key_store, hybrid_derived_key))
-}
-
 #[allow(clippy::too_many_arguments)]
 fn dps_x509_provision<HC>(
     memory_hsm: MemoryKeyStore,
@@ -1702,6 +1682,28 @@ fn dps_x509_provision<HC>(
             Ok((derived_key_store, prov_result, hybrid_derived_key))
         });
     tokio_runtime.block_on(provision)
+}
+
+fn prepare_derived_hybrid_key(
+    key_store: &MemoryKeyStore,
+    cert_thumbprint: &str,
+    hub_name: &str,
+    device_id: &str,
+) -> Result<(DerivedKeyStore<MemoryKey>, MemoryKey), Error> {
+    let k = key_store
+        .get(&KeyIdentity::Device, "primary")
+        .context(ErrorKind::Initialize(
+            InitializeErrorReason::HybridAuthKeyGet,
+        ))?;
+    let sign_data = format!("{}/devices/{}/{}", hub_name, device_id, cert_thumbprint);
+    let digest = k
+        .sign(SignatureAlgorithm::HMACSHA256, sign_data.as_bytes())
+        .context(ErrorKind::Initialize(
+            InitializeErrorReason::HybridAuthKeySign,
+        ))?;
+    let hybrid_derived_key = MemoryKey::new(digest.as_bytes());
+    let derived_key_store = DerivedKeyStore::new(hybrid_derived_key.clone());
+    Ok((derived_key_store, hybrid_derived_key))
 }
 
 fn external_provision_payload(key: &[u8]) -> (DerivedKeyStore<MemoryKey>, MemoryKey) {
@@ -1987,7 +1989,7 @@ where
     env
 }
 
-fn start_management<C, K, HC, M,>(
+fn start_management<C, K, HC, M>(
     settings: &M::Settings,
     runtime: &M::ModuleRuntime,
     id_man: &HubIdentityManager<DerivedKeyStore<K>, HC, K>,
@@ -2401,16 +2403,17 @@ mod tests {
         }
     }
 
-    #[test]
-    fn settings_manual_connection_string_auth_first_time_creates_backup() {
+    fn settings_first_time_creates_backup(
+    settings_path: &str,
+    ){
         let tmp_dir = TempDir::new("blah").unwrap();
-        let settings = Settings::new(Path::new(GOOD_SETTINGS)).unwrap();
+        let settings = Settings::new(Path::new(settings_path)).unwrap();
         let config = DockerConfig::new(
             "microsoft/test-image".to_string(),
             ContainerCreateBody::new(),
             None,
         )
-        .unwrap();
+            .unwrap();
         let state = ModuleRuntimeState::default();
         let module: TestModule<Error, _> =
             TestModule::new_with_config("test-module".to_string(), config, Ok(state));
@@ -2419,9 +2422,9 @@ mod tests {
             TestProvisioningResult::new(),
             TestHsm::default(),
         )
-        .wait()
-        .unwrap()
-        .with_module(Ok(module));
+            .wait()
+            .unwrap()
+            .with_module(Ok(module));
         let crypto = TestCrypto {
             use_expired_ca: false,
             fail_device_ca_alias: false,
@@ -2438,7 +2441,7 @@ mod tests {
             &mut tokio_runtime,
             None,
         )
-        .unwrap();
+            .unwrap();
         let expected = serde_json::to_string(&settings).unwrap();
         let expected_sha = Sha256::digest_str(&expected);
         let expected_base64 = base64::encode(&expected_sha);
@@ -2459,126 +2462,27 @@ mod tests {
             .path()
             .join(EDGE_HYBRID_IDENTITY_MASTER_KEY_IV_FILENAME)
             .exists());
+    }
+
+    #[test]
+    fn settings_manual_connection_string_auth_first_time_creates_backup() {
+        settings_first_time_creates_backup(GOOD_SETTINGS);
     }
 
     #[test]
     fn settings_dps_symm_key_auth_first_time_creates_backup() {
-        let tmp_dir = TempDir::new("blah").unwrap();
-        let settings = Settings::new(Path::new(GOOD_SETTINGS_DPS_SYMM_KEY)).unwrap();
-        let config = DockerConfig::new(
-            "microsoft/test-image".to_string(),
-            ContainerCreateBody::new(),
-            None,
-        )
-        .unwrap();
-        let state = ModuleRuntimeState::default();
-        let module: TestModule<Error, _> =
-            TestModule::new_with_config("test-module".to_string(), config, Ok(state));
-        let runtime = TestRuntime::make_runtime(
-            settings.clone(),
-            TestProvisioningResult::new(),
-            TestHsm::default(),
-        )
-        .wait()
-        .unwrap()
-        .with_module(Ok(module));
-        let crypto = TestCrypto {
-            use_expired_ca: false,
-            fail_device_ca_alias: false,
-            fail_decrypt: false,
-            fail_encrypt: false,
-        };
-        let mut tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-        check_settings_state::<TestRuntime<_, Settings>, _>(
-            tmp_dir.path(),
-            "settings_state",
-            &settings,
-            &runtime,
-            &crypto,
-            &mut tokio_runtime,
-            None,
-        )
-        .unwrap();
-        let expected = serde_json::to_string(&settings).unwrap();
-        let expected_sha = Sha256::digest_str(&expected);
-        let expected_base64 = base64::encode(&expected_sha);
-        let mut written = String::new();
-        File::open(tmp_dir.path().join("settings_state"))
-            .unwrap()
-            .read_to_string(&mut written)
-            .unwrap();
-
-        assert_eq!(expected_base64, written);
-
-        // non x.509 auth modes shouldn't have these files created
-        assert!(!tmp_dir
-            .path()
-            .join(EDGE_HYBRID_IDENTITY_MASTER_KEY_FILENAME)
-            .exists());
-        assert!(!tmp_dir
-            .path()
-            .join(EDGE_HYBRID_IDENTITY_MASTER_KEY_IV_FILENAME)
-            .exists());
+        settings_first_time_creates_backup(GOOD_SETTINGS_DPS_SYMM_KEY);
     }
 
     #[test]
     fn settings_dps_tpm_auth_first_time_creates_backup() {
-        let tmp_dir = TempDir::new("blah").unwrap();
-        let settings = Settings::new(Path::new(GOOD_SETTINGS_DPS_TPM1)).unwrap();
-        let config = DockerConfig::new(
-            "microsoft/test-image".to_string(),
-            ContainerCreateBody::new(),
-            None,
-        )
-        .unwrap();
-        let state = ModuleRuntimeState::default();
-        let module: TestModule<Error, _> =
-            TestModule::new_with_config("test-module".to_string(), config, Ok(state));
-        let runtime = TestRuntime::make_runtime(
-            settings.clone(),
-            TestProvisioningResult::new(),
-            TestHsm::default(),
-        )
-        .wait()
-        .unwrap()
-        .with_module(Ok(module));
-        let crypto = TestCrypto {
-            use_expired_ca: false,
-            fail_device_ca_alias: false,
-            fail_decrypt: false,
-            fail_encrypt: false,
-        };
-        let mut tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-        check_settings_state::<TestRuntime<_, Settings>, _>(
-            tmp_dir.path(),
-            "settings_state",
-            &settings,
-            &runtime,
-            &crypto,
-            &mut tokio_runtime,
-            None,
-        )
-        .unwrap();
-        let expected = serde_json::to_string(&settings).unwrap();
-        let expected_sha = Sha256::digest_str(&expected);
-        let expected_base64 = base64::encode(&expected_sha);
-        let mut written = String::new();
-        File::open(tmp_dir.path().join("settings_state"))
-            .unwrap()
-            .read_to_string(&mut written)
-            .unwrap();
+        settings_first_time_creates_backup(GOOD_SETTINGS_DPS_TPM1);
+    }
 
-        assert_eq!(expected_base64, written);
 
-        // non x.509 auth modes shouldn't have these files created
-        assert!(!tmp_dir
-            .path()
-            .join(EDGE_HYBRID_IDENTITY_MASTER_KEY_FILENAME)
-            .exists());
-        assert!(!tmp_dir
-            .path()
-            .join(EDGE_HYBRID_IDENTITY_MASTER_KEY_IV_FILENAME)
-            .exists());
+    #[test]
+    fn settings_external_provisioning_first_time_creates_backup() {
+        settings_first_time_creates_backup(GOOD_SETTINGS_EXTERNAL);
     }
 
     #[test]
