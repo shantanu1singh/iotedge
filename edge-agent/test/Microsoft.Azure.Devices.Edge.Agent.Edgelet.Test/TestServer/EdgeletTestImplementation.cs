@@ -154,5 +154,25 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Test.TestServer
             };
             return moduleDetails;
         }
+
+        Task IController.StopModuleAsync(string api_version, string name)
+        {
+            if (!this.modules.TryGetValue(name, out ModuleDetails module))
+            {
+                throw new InvalidOperationException("Module not found");
+            }
+
+            module.Status.RuntimeStatus.Status = "Stopped";
+            return Task.CompletedTask;
+        }
+
+        public Task ModuleLogsAsync(string api_version, string name, bool follow, string tail, int? since) => Task.CompletedTask;
+
+        public Task<SystemInfo> GetSystemInfoAsync(string api_version) => Task.FromResult(new SystemInfo());
+
+        public Task ReprovisionDeviceAsync(string api_version)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
