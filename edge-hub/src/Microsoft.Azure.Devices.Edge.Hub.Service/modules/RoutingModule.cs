@@ -521,28 +521,31 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service.Modules
             builder.Register(
                     async c =>
                     {
+                        // An EdgeHubConnection is created even for the 'local' config source
+                        // mode so as to enable the reporting of properties to IoT Hub.
                         RouteFactory routeFactory = await c.Resolve<Task<RouteFactory>>();
+                        var edgeHubCredentials = c.ResolveNamed<IClientCredentials>("EdgeHubCredentials");
+                        var twinCollectionMessageConverter = c.Resolve<Core.IMessageConverter<TwinCollection>>();
+                        var twinMessageConverter = c.Resolve<Core.IMessageConverter<Twin>>();
+                        var twinManagerTask = c.Resolve<Task<ITwinManager>>();
+                        var edgeHubTask = c.Resolve<Task<IEdgeHub>>();
+                        ITwinManager twinManager = await twinManagerTask;
+                        IEdgeHub edgeHub = await edgeHubTask;
+                        IConnectionManager connectionManager = await c.Resolve<Task<IConnectionManager>>();
+                        IDeviceScopeIdentitiesCache deviceScopeIdentitiesCache = await c.Resolve<Task<IDeviceScopeIdentitiesCache>>();
+                        IConfigSource edgeHubConnection = await EdgeHubConnection.Create(
+                            edgeHubCredentials.Identity,
+                            edgeHub,
+                            twinManager,
+                            connectionManager,
+                            routeFactory,
+                            twinCollectionMessageConverter,
+                            twinMessageConverter,
+                            this.versionInfo,
+                            deviceScopeIdentitiesCache);
+
                         if (this.useTwinConfig)
                         {
-                            var edgeHubCredentials = c.ResolveNamed<IClientCredentials>("EdgeHubCredentials");
-                            var twinCollectionMessageConverter = c.Resolve<Core.IMessageConverter<TwinCollection>>();
-                            var twinMessageConverter = c.Resolve<Core.IMessageConverter<Twin>>();
-                            var twinManagerTask = c.Resolve<Task<ITwinManager>>();
-                            var edgeHubTask = c.Resolve<Task<IEdgeHub>>();
-                            ITwinManager twinManager = await twinManagerTask;
-                            IEdgeHub edgeHub = await edgeHubTask;
-                            IConnectionManager connectionManager = await c.Resolve<Task<IConnectionManager>>();
-                            IDeviceScopeIdentitiesCache deviceScopeIdentitiesCache = await c.Resolve<Task<IDeviceScopeIdentitiesCache>>();
-                            IConfigSource edgeHubConnection = await EdgeHubConnection.Create(
-                                edgeHubCredentials.Identity,
-                                edgeHub,
-                                twinManager,
-                                connectionManager,
-                                routeFactory,
-                                twinCollectionMessageConverter,
-                                twinMessageConverter,
-                                this.versionInfo,
-                                deviceScopeIdentitiesCache);
                             return edgeHubConnection;
                         }
                         else
