@@ -7,6 +7,9 @@
 
 namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.GeneratedCode
 {
+    using System.Runtime.Serialization;
+    using Utf8Json;
+    using Utf8Json.Resolvers;
 #pragma warning disable // Disable all warnings
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "12.0.5.0 (NJsonSchema v9.13.2.0 (Newtonsoft.Json v11.0.0.0))")]
@@ -14,17 +17,17 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     {
         private string _baseUrl = "http://";
         private System.Net.Http.HttpClient _httpClient;
-        private System.Lazy<Newtonsoft.Json.JsonSerializerSettings> _settings;
+        //private System.Lazy<Newtonsoft.Json.JsonSerializerSettings> _settings;
 
         public EdgeletHttpClient(System.Net.Http.HttpClient httpClient)
         {
             _httpClient = httpClient;
-            _settings = new System.Lazy<Newtonsoft.Json.JsonSerializerSettings>(() =>
-            {
-                var settings = new Newtonsoft.Json.JsonSerializerSettings();
-                UpdateJsonSerializerSettings(settings);
-                return settings;
-            });
+            //_settings = new System.Lazy<Newtonsoft.Json.JsonSerializerSettings>(() =>
+            //{
+            //    var settings = new Newtonsoft.Json.JsonSerializerSettings();
+            //    UpdateJsonSerializerSettings(settings);
+            //    return settings;
+            //});
         }
 
         public string BaseUrl
@@ -33,9 +36,9 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
             set { _baseUrl = value; }
         }
 
-        protected Newtonsoft.Json.JsonSerializerSettings JsonSerializerSettings { get { return _settings.Value; } }
+        //protected Newtonsoft.Json.JsonSerializerSettings JsonSerializerSettings { get { return _settings.Value; } }
 
-        partial void UpdateJsonSerializerSettings(Newtonsoft.Json.JsonSerializerSettings settings);
+        //partial void UpdateJsonSerializerSettings(Newtonsoft.Json.JsonSerializerSettings settings);
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, string url);
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
@@ -96,7 +99,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ModuleList);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ModuleList>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ModuleList>(responseData_);
                                 return result_;
                             }
                             catch (System.Exception exception_)
@@ -110,7 +113,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -160,7 +163,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
-                    var content_ = new System.Net.Http.StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(module, _settings.Value));
+                    var content_ = new System.Net.Http.StringContent(JsonSerializer.ToJsonString(module));
                     content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
                     request_.Content = content_;
                     request_.Method = new System.Net.Http.HttpMethod("POST");
@@ -190,7 +193,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ModuleDetails);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ModuleDetails>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ModuleDetails>(responseData_);
                                 return result_;
                             }
                             catch (System.Exception exception_)
@@ -205,7 +208,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -219,7 +222,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -302,7 +305,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ModuleDetails);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ModuleDetails>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ModuleDetails>(responseData_);
                                 return result_;
                             }
                             catch (System.Exception exception_)
@@ -317,7 +320,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -331,7 +334,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -393,7 +396,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
-                    var content_ = new System.Net.Http.StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(module, _settings.Value));
+                    var content_ = new System.Net.Http.StringContent(JsonSerializer.ToJsonString(module));
                     content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
                     request_.Content = content_;
                     request_.Method = new System.Net.Http.HttpMethod("PUT");
@@ -423,7 +426,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ModuleDetails);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ModuleDetails>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ModuleDetails>(responseData_);
                                 return result_;
                             }
                             catch (System.Exception exception_)
@@ -438,7 +441,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -452,7 +455,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -539,7 +542,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -553,7 +556,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -609,7 +612,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
-                    var content_ = new System.Net.Http.StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(module, _settings.Value));
+                    var content_ = new System.Net.Http.StringContent(JsonSerializer.ToJsonString(module));
                     content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
                     request_.Content = content_;
                     request_.Method = new System.Net.Http.HttpMethod("POST");
@@ -643,7 +646,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -657,7 +660,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -751,7 +754,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -765,7 +768,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -859,7 +862,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -873,7 +876,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -967,7 +970,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -981,7 +984,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1092,7 +1095,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1106,7 +1109,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1183,7 +1186,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(IdentityList);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<IdentityList>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<IdentityList>(responseData_);
                                 return result_;
                             }
                             catch (System.Exception exception_)
@@ -1197,7 +1200,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1247,7 +1250,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
-                    var content_ = new System.Net.Http.StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(identity, _settings.Value));
+                    var content_ = new System.Net.Http.StringContent(JsonSerializer.ToJsonString(identity));
                     content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
                     request_.Content = content_;
                     request_.Method = new System.Net.Http.HttpMethod("POST");
@@ -1277,7 +1280,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(Identity);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<Identity>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<Identity>(responseData_);
                                 return result_;
                             }
                             catch (System.Exception exception_)
@@ -1291,7 +1294,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1347,7 +1350,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
-                    var content_ = new System.Net.Http.StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(updateinfo, _settings.Value));
+                    var content_ = new System.Net.Http.StringContent(JsonSerializer.ToJsonString(updateinfo));
                     content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
                     request_.Content = content_;
                     request_.Method = new System.Net.Http.HttpMethod("PUT");
@@ -1377,7 +1380,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(Identity);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<Identity>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<Identity>(responseData_);
                                 return result_;
                             }
                             catch (System.Exception exception_)
@@ -1391,7 +1394,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1478,7 +1481,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1492,7 +1495,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1569,7 +1572,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(SystemInfo);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<SystemInfo>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<SystemInfo>(responseData_);
                                 return result_;
                             }
                             catch (System.Exception exception_)
@@ -1583,7 +1586,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1664,7 +1667,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
                             var result_ = default(ErrorResponse);
                             try
                             {
-                                result_ = Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(responseData_, _settings.Value);
+                                result_ = JsonSerializer.Deserialize<ErrorResponse>(responseData_);
                             }
                             catch (System.Exception exception_)
                             {
@@ -1727,17 +1730,17 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class ModuleList
     {
-        [Newtonsoft.Json.JsonProperty("modules", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "modules", IsRequired = true)]
         public System.Collections.Generic.ICollection<ModuleDetails> Modules { get; set; } = new System.Collections.ObjectModel.Collection<ModuleDetails>();
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this);
         }
 
         public static ModuleList FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<ModuleList>(data);
+            return JsonSerializer.Deserialize<ModuleList>(data);
         }
 
     }
@@ -1746,31 +1749,31 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     public partial class ModuleDetails
     {
         /// <summary>System generated unique identitier.</summary>
-        [Newtonsoft.Json.JsonProperty("id", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "id", IsRequired = true)]
         public string Id { get; set; }
 
         /// <summary>The name of the module.</summary>
-        [Newtonsoft.Json.JsonProperty("name", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "name", IsRequired = true)]
         public string Name { get; set; }
 
         /// <summary>The type of a module.</summary>
-        [Newtonsoft.Json.JsonProperty("type", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "type", IsRequired = true)]
         public string Type { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("config", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "config", IsRequired = true)]
         public Config Config { get; set; } = new Config();
 
-        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "status", IsRequired = true)]
         public Status Status { get; set; } = new Status();
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this);
         }
 
         public static ModuleDetails FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<ModuleDetails>(data);
+            return JsonSerializer.Deserialize<ModuleDetails>(data);
         }
 
     }
@@ -1779,27 +1782,26 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     public partial class ModuleSpec
     {
         /// <summary>The name of a the module.</summary>
-        [Newtonsoft.Json.JsonProperty("name", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "name", IsRequired = true)]
         public string Name { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("type", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "type", IsRequired = true)]
         public string Type { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("imagePullPolicy", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [DataMember(Name = "imagePullPolicy", IsRequired = false)]
         public ImagePullPolicy? ImagePullPolicy { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("config", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "config", IsRequired = true)]
         public Config Config { get; set; } = new Config();
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this, StandardResolver.ExcludeNull);
         }
 
         public static ModuleSpec FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<ModuleSpec>(data);
+            return JsonSerializer.Deserialize<ModuleSpec>(data);
         }
 
     }
@@ -1807,20 +1809,20 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class Config
     {
-        [Newtonsoft.Json.JsonProperty("settings", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "settings", IsRequired = true)]
         public object Settings { get; set; } = new object();
 
-        [Newtonsoft.Json.JsonProperty("env", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [DataMember(Name = "env", IsRequired = false)]
         public System.Collections.Generic.ICollection<EnvVar> Env { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this, StandardResolver.ExcludeNull);
         }
 
         public static Config FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<Config>(data);
+            return JsonSerializer.Deserialize<Config>(data);
         }
 
     }
@@ -1828,23 +1830,23 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class Status
     {
-        [Newtonsoft.Json.JsonProperty("startTime", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [DataMember(Name = "startTime", IsRequired = false)]
         public System.DateTime? StartTime { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("exitStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [DataMember(Name = "exitStatus", IsRequired = false)]
         public ExitStatus ExitStatus { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("runtimeStatus", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "runtimeStatus", IsRequired = true)]
         public RuntimeStatus RuntimeStatus { get; set; } = new RuntimeStatus();
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this, StandardResolver.ExcludeNull);
         }
 
         public static Status FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<Status>(data);
+            return JsonSerializer.Deserialize<Status>(data);
         }
 
     }
@@ -1852,20 +1854,20 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class EnvVar
     {
-        [Newtonsoft.Json.JsonProperty("key", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "key", IsRequired = true)]
         public string Key { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("value", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "value", IsRequired = true)]
         public string Value { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this);
         }
 
         public static EnvVar FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<EnvVar>(data);
+            return JsonSerializer.Deserialize<EnvVar>(data);
         }
 
     }
@@ -1873,20 +1875,20 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class ExitStatus
     {
-        [Newtonsoft.Json.JsonProperty("exitTime", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "exitTime", IsRequired = true)]
         public System.DateTime ExitTime { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("statusCode", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "statusCode", IsRequired = true)]
         public string StatusCode { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this);
         }
 
         public static ExitStatus FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<ExitStatus>(data);
+            return JsonSerializer.Deserialize<ExitStatus>(data);
         }
 
     }
@@ -1894,20 +1896,20 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class RuntimeStatus
     {
-        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "status", IsRequired = true)]
         public string Status { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("description", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [DataMember(Name = "description", IsRequired = false)]
         public string Description { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this, StandardResolver.ExcludeNull);
         }
 
         public static RuntimeStatus FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<RuntimeStatus>(data);
+            return JsonSerializer.Deserialize<RuntimeStatus>(data);
         }
 
     }
@@ -1915,23 +1917,23 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class SystemInfo
     {
-        [Newtonsoft.Json.JsonProperty("osType", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "osType", IsRequired = true)]
         public string OsType { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("architecture", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "architecture", IsRequired = true)]
         public string Architecture { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("version", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [DataMember(Name = "version", IsRequired = false)]
         public string Version { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this, StandardResolver.ExcludeNull);
         }
 
         public static SystemInfo FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<SystemInfo>(data);
+            return JsonSerializer.Deserialize<SystemInfo>(data);
         }
 
     }
@@ -1939,17 +1941,17 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class IdentityList
     {
-        [Newtonsoft.Json.JsonProperty("identities", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "identities", IsRequired = true)]
         public System.Collections.Generic.ICollection<Identity> Identities { get; set; } = new System.Collections.ObjectModel.Collection<Identity>();
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this);
         }
 
         public static IdentityList FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<IdentityList>(data);
+            return JsonSerializer.Deserialize<IdentityList>(data);
         }
 
     }
@@ -1957,20 +1959,20 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class IdentitySpec
     {
-        [Newtonsoft.Json.JsonProperty("moduleId", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "moduleId", IsRequired = true)]
         public string ModuleId { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("managedBy", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [DataMember(Name = "managedBy", IsRequired = false)]
         public string ManagedBy { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this, StandardResolver.ExcludeNull);
         }
 
         public static IdentitySpec FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<IdentitySpec>(data);
+            return JsonSerializer.Deserialize<IdentitySpec>(data);
         }
 
     }
@@ -1978,20 +1980,20 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class UpdateIdentity
     {
-        [Newtonsoft.Json.JsonProperty("generationId", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "generationId", IsRequired = true)]
         public string GenerationId { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("managedBy", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [DataMember(Name = "managedBy", IsRequired = false)]
         public string ManagedBy { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this, StandardResolver.ExcludeNull);
         }
 
         public static UpdateIdentity FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<UpdateIdentity>(data);
+            return JsonSerializer.Deserialize<UpdateIdentity>(data);
         }
 
     }
@@ -1999,27 +2001,27 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class Identity
     {
-        [Newtonsoft.Json.JsonProperty("moduleId", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "moduleId", IsRequired = true)]
         public string ModuleId { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("managedBy", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "managedBy", IsRequired = true)]
         public string ManagedBy { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("generationId", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "generationId", IsRequired = true)]
         public string GenerationId { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("authType", Required = Newtonsoft.Json.Required.Always)]
-        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [DataMember(Name = "authType", IsRequired = true)]
+        //[Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public IdentityAuthType AuthType { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this);
         }
 
         public static Identity FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<Identity>(data);
+            return JsonSerializer.Deserialize<Identity>(data);
         }
 
     }
@@ -2027,17 +2029,17 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Edgelet.Version_2019_10_22.Generate
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "9.13.2.0 (Newtonsoft.Json v11.0.0.0)")]
     public partial class ErrorResponse
     {
-        [Newtonsoft.Json.JsonProperty("message", Required = Newtonsoft.Json.Required.Always)]
+        [DataMember(Name = "message", IsRequired = true)]
         public string Message { get; set; }
 
         public string ToJson()
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(this);
+            return JsonSerializer.ToJsonString(this);
         }
 
         public static ErrorResponse FromJson(string data)
         {
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<ErrorResponse>(data);
+            return JsonSerializer.Deserialize<ErrorResponse>(data);
         }
 
     }
