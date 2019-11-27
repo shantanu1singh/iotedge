@@ -25,6 +25,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
 
         FileConfigSource(FileSystemWatcher watcher, DeploymentConfigInfo initial, IConfiguration configuration, ISerde<DeploymentConfigInfo> serde)
         {
+            Events.LogI("Creating file config s");
             this.watcher = Preconditions.CheckNotNull(watcher, nameof(watcher));
             this.Configuration = Preconditions.CheckNotNull(configuration, nameof(configuration));
             this.current = new AtomicReference<DeploymentConfigInfo>(Preconditions.CheckNotNull(initial, nameof(initial)));
@@ -32,11 +33,13 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
             this.configFilePath = Path.Combine(this.watcher.Path, this.watcher.Filter);
 
             this.sync = new AsyncLock();
+            Events.LogI("Created lock");
             this.watcherSubscription = Observable
                 .FromEventPattern<FileSystemEventArgs>(this.watcher, "Changed")
                 // Rx.NET's "Throttle" is really "Debounce". An unfortunate naming mishap.
                 .Throttle(TimeSpan.FromMilliseconds(FileChangeWatcherDebounceInterval))
                 .Subscribe(this.WatcherOnChanged);
+            Events.LogI("Created watcher");
             this.watcher.EnableRaisingEvents = true;
             Events.Created(this.configFilePath);
         }
@@ -52,14 +55,20 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
                 throw new FileNotFoundException("Invalid config file path", path);
             }
 
+            Events.LogI("Get dir name");
+
             string directoryName = Path.GetDirectoryName(path);
             string fileName = Path.GetFileName(path);
+            Events.LogI("read dir name");
 
             DeploymentConfigInfo initial = await ReadFromDisk(path, serde);
+            Events.LogI("read config from disk");
             var watcher = new FileSystemWatcher(directoryName, fileName)
             {
                 NotifyFilter = NotifyFilters.LastWrite
             };
+
+            Events.LogI("created watcher");
             return new FileConfigSource(watcher, initial, configuration, serde);
         }
 
@@ -74,6 +83,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
         static async Task<DeploymentConfigInfo> ReadFromDisk(string path, ISerde<DeploymentConfigInfo> serde)
         {
             string json = await DiskFile.ReadAllAsync(path);
+            Events.LogI("read");
             DeploymentConfigInfo deploymentConfig = serde.Deserialize(json);
             return deploymentConfig;
         }
@@ -125,6 +135,11 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
             public static void NewConfigurationFailed(Exception exception, string filename)
             {
                 Log.LogError((int)EventIds.NewConfigurationFailed, exception, $"FileConfigSource failed reading new configuration file, {filename}");
+            }
+
+            public static void LogI(string log)
+            {
+                Log.LogDebug((int)EventIds.NewConfigurationFailed, log);
             }
         }
     }

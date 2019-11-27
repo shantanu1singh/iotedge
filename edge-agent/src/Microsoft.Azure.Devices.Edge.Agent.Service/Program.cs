@@ -300,13 +300,17 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
 
             (CancellationTokenSource cts, ManualResetEventSlim completed, Option<object> handler)
                 = ShutdownHandler.Init(ShutdownWaitPeriod, logger);
+            logger.LogInformation("Registering request handlers.");
 
             // Register request handlers
-            await RegisterRequestHandlers(container);
+            await RegisterRequestHandlers(container, logger);
+            logger.LogInformation("Done.");
 
             // Initialize stream request listener
             IStreamRequestListener streamRequestListener = await container.Resolve<Task<IStreamRequestListener>>();
+            logger.LogInformation("Init pump." + streamRequestListener.GetType());
             streamRequestListener.InitPump();
+            logger.LogInformation("Done.");
 
             int returnCode;
             using (IConfigSource unused = await container.Resolve<Task<IConfigSource>>())
@@ -362,12 +366,17 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
             return returnCode;
         }
 
-        static async Task RegisterRequestHandlers(IContainer container)
+        static async Task RegisterRequestHandlers(IContainer container, ILogger logger)
         {
             var requestHandlerTasks = container.Resolve<IEnumerable<Task<IRequestHandler>>>();
+            logger.LogInformation("obtained tasks");
             IRequestHandler[] requestHandlers = await Task.WhenAll(requestHandlerTasks);
+            logger.LogInformation("waited");
             IRequestManager requestManager = container.Resolve<IRequestManager>();
+            logger.LogInformation("obtained request manager");
             requestManager.RegisterHandlers(requestHandlers);
+
+            logger.LogInformation("Registered ");
         }
 
         static ILogger SetupLogger(IConfiguration configuration)

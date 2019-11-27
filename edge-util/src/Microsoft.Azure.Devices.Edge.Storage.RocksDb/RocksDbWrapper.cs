@@ -6,6 +6,7 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
     using System.Linq;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Azure.Devices.Edge.Util.Concurrency;
+    using Microsoft.Extensions.Logging;
     using RocksDbSharp;
 
     /// <summary>
@@ -26,12 +27,13 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             this.dbOptions = dbOptions;
         }
 
-        public static RocksDbWrapper Create(IRocksDbOptionsProvider optionsProvider, string path, IEnumerable<string> partitionsList)
+        public static RocksDbWrapper Create(IRocksDbOptionsProvider optionsProvider, string path, IEnumerable<string> partitionsList, ILogger logger)
         {
             Preconditions.CheckNonWhiteSpace(path, nameof(path));
             Preconditions.CheckNotNull(optionsProvider, nameof(optionsProvider));
             DbOptions dbOptions = Preconditions.CheckNotNull(optionsProvider.GetDbOptions());
             IEnumerable<string> existingColumnFamilies = ListColumnFamilies(dbOptions, path);
+            logger.LogInformation(100, "listed column families");
             IEnumerable<string> columnFamiliesList = existingColumnFamilies.Union(Preconditions.CheckNotNull(partitionsList, nameof(partitionsList)), StringComparer.OrdinalIgnoreCase).ToList();
             var columnFamilies = new ColumnFamilies();
             foreach (string columnFamilyName in columnFamiliesList)
@@ -39,7 +41,9 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 columnFamilies.Add(columnFamilyName, optionsProvider.GetColumnFamilyOptions());
             }
 
+            logger.LogInformation(100, "Opening db");
             RocksDb db = RocksDb.Open(dbOptions, path, columnFamilies);
+            logger.LogInformation(100, "Opened db");
             var rocksDbWrapper = new RocksDbWrapper(dbOptions, db, path);
             return rocksDbWrapper;
         }

@@ -4,6 +4,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Serde
     using System;
     using System.Collections.Generic;
     using Microsoft.Azure.Devices.Edge.Util;
+    using Microsoft.Extensions.Logging;
     using Newtonsoft.Json;
     using Newtonsoft.Json.Linq;
     using Newtonsoft.Json.Serialization;
@@ -20,7 +21,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Serde
         // IRuntimeInfo ->
         //             "docker" -> DockerRuntimeInfo
         // This enables supporting multiple interfaces in an object, for different "types" like Docker.
-        public TypeSpecificSerDe(IDictionary<Type, IDictionary<string, Type>> deserializerTypesMap)
+        public TypeSpecificSerDe(IDictionary<Type, IDictionary<string, Type>> deserializerTypesMap, ILogger logger = null)
         {
             Preconditions.CheckNotNull(deserializerTypesMap, nameof(deserializerTypesMap));
 
@@ -28,12 +29,12 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Serde
             {
                 Converters = new List<JsonConverter>
                 {
-                    new TypeSpecificJsonConverter(deserializerTypesMap)
+                    new TypeSpecificJsonConverter(deserializerTypesMap, logger)
                 }
             };
         }
 
-        public TypeSpecificSerDe(IDictionary<Type, IDictionary<string, Type>> deserializerTypesMap, IContractResolver resolver)
+        public TypeSpecificSerDe(IDictionary<Type, IDictionary<string, Type>> deserializerTypesMap, IContractResolver resolver, ILogger logger = null)
         {
             Preconditions.CheckNotNull(deserializerTypesMap, nameof(deserializerTypesMap));
             Preconditions.CheckNotNull(resolver, nameof(resolver));
@@ -71,9 +72,11 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Serde
         class TypeSpecificJsonConverter : JsonConverter
         {
             readonly IDictionary<Type, IDictionary<string, Type>> deserializerTypesMap;
+            readonly ILogger logger;
 
-            public TypeSpecificJsonConverter(IDictionary<Type, IDictionary<string, Type>> deserializerTypesMap)
+            public TypeSpecificJsonConverter(IDictionary<Type, IDictionary<string, Type>> deserializerTypesMap, ILogger logger = null)
             {
+                this.logger = logger;
                 this.deserializerTypesMap = new Dictionary<Type, IDictionary<string, Type>>();
                 foreach (KeyValuePair<Type, IDictionary<string, Type>> deserializerTypes in deserializerTypesMap)
                 {
@@ -85,6 +88,8 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Serde
 
             public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
             {
+                this.logger.LogInformation(100, "Entered ReadJson");
+
                 // The null check is required to gracefully handle a null object
                 if (reader.TokenType == JsonToken.Null)
                 {
@@ -96,15 +101,20 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.Serde
                     throw new JsonSerializationException($"Could not find type {objectType.Name} in deserializerTypeMap");
                 }
 
+                this.logger.LogInformation(100, "Loading object");
+
                 JObject obj = JObject.Load(reader);
                 var converterType = obj.Get<JToken>("type");
+                this.logger.LogInformation(100, $"Loaded {converterType}");
 
                 if (!deserializerTypeMap.TryGetValue(converterType.Value<string>(), out Type serializeType))
                 {
                     throw new JsonSerializationException($"Could not find right converter given a type {converterType.Value<string>()}");
                 }
 
+                this.logger.LogInformation(100, $"Des");
                 object deserializedObject = JsonConvert.DeserializeObject(obj.ToString(), serializeType);
+                this.logger.LogInformation(100, $"Done des");
                 return deserializedObject;
             }
 

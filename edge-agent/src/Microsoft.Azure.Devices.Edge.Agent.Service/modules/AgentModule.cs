@@ -115,7 +115,9 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
             builder.Register(
                     c =>
                     {
-                        ISerde<DeploymentConfig> serde = new TypeSpecificSerDe<DeploymentConfig>(DeploymentConfigTypeMapping);
+                        var loggerFactory = c.Resolve<ILoggerFactory>();
+                        ILogger logger = loggerFactory.CreateLogger(typeof(DeploymentConfig));
+                        ISerde<DeploymentConfig> serde = new TypeSpecificSerDe<DeploymentConfig>(DeploymentConfigTypeMapping, logger);
                         return serde;
                     })
                 .As<ISerde<DeploymentConfig>>()
@@ -125,7 +127,9 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
             builder.Register(
                     c =>
                     {
-                        ISerde<DeploymentConfigInfo> serde = new TypeSpecificSerDe<DeploymentConfigInfo>(DeploymentConfigTypeMapping);
+                        var loggerFactory = c.Resolve<ILoggerFactory>();
+                        ILogger logger = loggerFactory.CreateLogger(typeof(DeploymentConfigInfo));
+                        ISerde<DeploymentConfigInfo> serde = new TypeSpecificSerDe<DeploymentConfigInfo>(DeploymentConfigTypeMapping, logger);
                         return serde;
                     })
                 .As<ISerde<DeploymentConfigInfo>>()
@@ -163,6 +167,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service.Modules
                             var partitionsList = new List<string> { "moduleState", "deploymentConfig" };
                             try
                             {
+                                logger.LogInformation($"Creating persistent store at {this.storagePath}");
                                 IDbStoreProvider dbStoreprovider = DbStoreProvider.Create(
                                     c.Resolve<IRocksDbOptionsProvider>(),
                                     this.storagePath,

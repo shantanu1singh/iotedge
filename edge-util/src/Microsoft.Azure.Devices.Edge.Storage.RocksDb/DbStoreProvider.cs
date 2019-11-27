@@ -30,8 +30,11 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public static DbStoreProvider Create(IRocksDbOptionsProvider optionsProvider, string path, IEnumerable<string> partitionsList)
         {
-            IRocksDb db = RocksDbWrapper.Create(optionsProvider, path, partitionsList);
+            Events.LogD("Creating wrapper");
+            IRocksDb db = RocksDbWrapper.Create(optionsProvider, path, partitionsList, Events.Log);
+            Events.LogD("Created wrapper");
             IEnumerable<string> columnFamilies = db.ListColumnFamilies();
+            Events.LogD("Got column families");
             IDictionary<string, IDbStore> entityDbStoreDictionary = new Dictionary<string, IDbStore>();
             foreach (string columnFamilyName in columnFamilies)
             {
@@ -39,6 +42,8 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
                 var dbStorePartition = new ColumnFamilyDbStore(db, handle);
                 entityDbStoreDictionary[columnFamilyName] = dbStorePartition;
             }
+
+            Events.LogD("Iterated over column families");
 
             var dbStore = new DbStoreProvider(optionsProvider, db, entityDbStoreDictionary);
             return dbStore;
@@ -108,11 +113,11 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
 
         public void RemoveDbStore() => this.RemoveDbStore(DefaultPartitionName);
 
-        static class Events
+        public static class Events
         {
             // Use an ID not used by other components
             const int IdStart = 4000;
-            static readonly ILogger Log = Logger.Factory.CreateLogger<DbStoreProvider>();
+            public static readonly ILogger Log = Logger.Factory.CreateLogger<DbStoreProvider>();
 
             enum EventIds
             {
@@ -128,6 +133,11 @@ namespace Microsoft.Azure.Devices.Edge.Storage.RocksDb
             internal static void CompactingStore(string storeName)
             {
                 Log.LogInformation((int)EventIds.StoreCompaction, $"Starting compaction of store {storeName}");
+            }
+
+            internal static void LogD(string storeName)
+            {
+                Log.LogInformation((int)EventIds.StoreCompaction, storeName);
             }
         }
     }
