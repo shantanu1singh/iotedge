@@ -4,12 +4,13 @@ namespace Microsoft.Azure.Devices.Edge.Util
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Runtime.Serialization;
     using System.Text;
-    using Newtonsoft.Json;
+    using Utf8Json;
 
     public class VersionInfo : IEquatable<VersionInfo>
     {
-        [JsonConstructor]
+        [SerializationConstructor]
         public VersionInfo(string version, string build, string commit)
         {
             this.Version = version;
@@ -19,13 +20,13 @@ namespace Microsoft.Azure.Devices.Edge.Util
 
         public static VersionInfo Empty { get; } = new VersionInfo(string.Empty, string.Empty, string.Empty);
 
-        [JsonProperty(PropertyName = "version")]
+        [DataMember(Name = "version")]
         public string Version { get; }
 
-        [JsonProperty(PropertyName = "build")]
+        [DataMember(Name = "build")]
         public string Build { get; }
 
-        [JsonProperty(PropertyName = "commit")]
+        [DataMember(Name = "commit")]
         public string Commit { get; }
 
         public static VersionInfo Get(string fileName)
@@ -36,7 +37,7 @@ namespace Microsoft.Azure.Devices.Edge.Util
                 if (File.Exists(fileName))
                 {
                     string fileText = File.ReadAllText(fileName);
-                    return JsonConvert.DeserializeObject<VersionInfo>(fileText);
+                    return JsonSerializer.Deserialize<VersionInfo>(fileText);
                 }
             }
             catch (Exception ex) when (!ex.IsFatal())
