@@ -10,6 +10,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Azure.Devices.Edge.Util.Concurrency;
     using Microsoft.Extensions.Configuration;
+    using Microsoft.Extensions.FileProviders;
     using Microsoft.Extensions.Logging;
 
     public class FileConfigSource : IConfigSource
@@ -37,6 +38,8 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
                 // Rx.NET's "Throttle" is really "Debounce". An unfortunate naming mishap.
                 .Throttle(TimeSpan.FromMilliseconds(FileChangeWatcherDebounceInterval))
                 .Subscribe(this.WatcherOnChanged);
+
+
             this.watcher.EnableRaisingEvents = true;
             Events.Created(this.configFilePath);
         }
@@ -60,6 +63,10 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
             {
                 NotifyFilter = NotifyFilters.LastWrite
             };
+
+            PhysicalFileProvider fileProvider =
+                new PhysicalFileProvider(Directory.GetCurrentDirectory());
+
             return new FileConfigSource(watcher, initial, configuration, serde);
         }
 
