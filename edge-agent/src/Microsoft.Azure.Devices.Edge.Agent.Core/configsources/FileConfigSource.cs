@@ -3,7 +3,6 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
 {
     using System;
     using System.IO;
-    using System.Reactive;
     using System.Reactive.Linq;
     using System.Threading.Tasks;
     using Microsoft.Azure.Devices.Edge.Agent.Core.Serde;
@@ -16,11 +15,8 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
 
     public class FileConfigSource : IConfigSource
     {
-        //const double FileChangeWatcherDebounceInterval = 500;
-
         readonly PhysicalFileProvider fileProvider;
         readonly string configFilePath;
-        //readonly IDisposable watcherSubscription;
         readonly AtomicReference<DeploymentConfigInfo> current;
         readonly AsyncLock sync;
         readonly ISerde<DeploymentConfigInfo> serde;
@@ -35,13 +31,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
             this.configFilePath = Path.Combine(fileProvider.Root, fileName);
 
             this.sync = new AsyncLock();
-            //this.watcherSubscription = Observable
-            //    .FromEventPattern<FileSystemEventArgs>(this.watcher, "Changed")
-            //    // Rx.NET's "Throttle" is really "Debounce". An unfortunate naming mishap.
-            //    .Throttle(TimeSpan.FromMilliseconds(FileChangeWatcherDebounceInterval))
-            //    .Subscribe(this.WatcherOnChanged);
-            //this.watcher.EnableRaisingEvents = true;
-
+            
             this.fileChangeToken = this.fileProvider.Watch(fileName);
             this.fileChangeToken.RegisterChangeCallback(this.WatcherOnChanged, default);
             Events.Created(this.configFilePath);
@@ -71,7 +61,6 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
 
         public void Dispose()
         {
-            //this.watcherSubscription.Dispose();
             this.fileProvider.Dispose();
         }
 
@@ -92,11 +81,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
         }
 
         async void WatcherOnChanged(object state)
-        //async void WatcherOnChanged(EventPattern<FileSystemEventArgs> args)
         {
-            //if ((args.EventArgs.ChangeType & WatcherChangeTypes.Changed) != WatcherChangeTypes.Changed)
-            //    return;
-
             try
             {
                 using (await this.sync.LockAsync())
