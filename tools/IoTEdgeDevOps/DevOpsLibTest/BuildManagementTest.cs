@@ -48,7 +48,7 @@ namespace DevOpsLibTest
         public async Task TestGetLatestBuildsAsyncWithEmptyBranchName()
         {
             ArgumentException ex = Assert.ThrowsAsync<ArgumentException>(
-                async () => { await this.buildManagement.GetLatestBuildsAsync(BuildDefinitionExtension.MasterBranchReporting, " ").ConfigureAwait(false); });
+                async () => { await this.buildManagement.GetLatestBuildsAsync(BuildExtension.MasterBranchReporting, " ").ConfigureAwait(false); });
 
             Assert.True(ex.Message.StartsWith("Cannot be null or white space."));
             Assert.That(ex.ParamName, Is.EqualTo("branchName"));
@@ -173,7 +173,32 @@ namespace DevOpsLibTest
                 .WithBasicAuth(string.Empty, PersonalAccessToken)
                 .Times(1);
 
-            Assert.AreEqual(latestBuilds.Count, 2);
+            Assert.AreEqual( 2, latestBuilds.Count);
+            VerifyEmptyBuildResult(latestBuilds.First(b => b.DefinitionId == BuildDefinitionId.BuildImages));
+            VerifyEmptyBuildResult(latestBuilds.First(b => b.DefinitionId == BuildDefinitionId.CI));
+        }
+
+        public async Task TestGetLatestBuildsAsyncWithUnexpectedResult()
+        {
+            this.httpTest.RespondWithJson(
+                new
+                {
+                    unexpected = new {}
+                });
+
+            string branch = "refs/heads/master";
+            IList<VstsBuild> latestBuilds = await this.buildManagement.GetLatestBuildsAsync(
+                new HashSet<BuildDefinitionId> { BuildDefinitionId.BuildImages, BuildDefinitionId.CI },
+                branch).ConfigureAwait(false);
+
+            string definitionIdsDelimitedValues = Url.Encode(string.Join(",", new[] { BuildDefinitionId.BuildImages.IdString(), BuildDefinitionId.CI.IdString() }));
+            string requestUri = $"https://dev.azure.com/{DevOpsAccessSetting.AzureOrganization}/{DevOpsAccessSetting.AzureProject}/_apis/build/builds?definitions={definitionIdsDelimitedValues}&queryOrder=finishTimeDescending&maxBuildsPerDefinition=1&api-version=5.1&branchName={Url.Encode(branch)}";
+            this.httpTest.ShouldHaveCalled(requestUri)
+                .WithVerb(HttpMethod.Get)
+                .WithBasicAuth(string.Empty, PersonalAccessToken)
+                .Times(1);
+
+            Assert.AreEqual(2, latestBuilds.Count);
             VerifyEmptyBuildResult(latestBuilds.First(b => b.DefinitionId == BuildDefinitionId.BuildImages));
             VerifyEmptyBuildResult(latestBuilds.First(b => b.DefinitionId == BuildDefinitionId.CI));
         }
