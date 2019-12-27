@@ -12,35 +12,38 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.FileProviders;
     using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Primitives;
 
     public class FileConfigSource : IConfigSource
     {
-        const double FileChangeWatcherDebounceInterval = 500;
+        //const double FileChangeWatcherDebounceInterval = 500;
 
-        readonly FileSystemWatcher watcher;
+        readonly PhysicalFileProvider fileProvider;
         readonly string configFilePath;
-        readonly IDisposable watcherSubscription;
+        //readonly IDisposable watcherSubscription;
         readonly AtomicReference<DeploymentConfigInfo> current;
         readonly AsyncLock sync;
         readonly ISerde<DeploymentConfigInfo> serde;
+        IChangeToken fileChangeToken;
 
-        FileConfigSource(FileSystemWatcher watcher, DeploymentConfigInfo initial, IConfiguration configuration, ISerde<DeploymentConfigInfo> serde)
+        FileConfigSource(PhysicalFileProvider fileProvider, string fileName, DeploymentConfigInfo initial, IConfiguration configuration, ISerde<DeploymentConfigInfo> serde)
         {
-            this.watcher = Preconditions.CheckNotNull(watcher, nameof(watcher));
+            this.fileProvider = Preconditions.CheckNotNull(fileProvider, nameof(fileProvider));
             this.Configuration = Preconditions.CheckNotNull(configuration, nameof(configuration));
             this.current = new AtomicReference<DeploymentConfigInfo>(Preconditions.CheckNotNull(initial, nameof(initial)));
             this.serde = Preconditions.CheckNotNull(serde, nameof(serde));
-            this.configFilePath = Path.Combine(this.watcher.Path, this.watcher.Filter);
+            this.configFilePath = Path.Combine(fileProvider.Root, fileName);
 
             this.sync = new AsyncLock();
-            this.watcherSubscription = Observable
-                .FromEventPattern<FileSystemEventArgs>(this.watcher, "Changed")
-                // Rx.NET's "Throttle" is really "Debounce". An unfortunate naming mishap.
-                .Throttle(TimeSpan.FromMilliseconds(FileChangeWatcherDebounceInterval))
-                .Subscribe(this.WatcherOnChanged);
+            //this.watcherSubscription = Observable
+            //    .FromEventPattern<FileSystemEventArgs>(this.watcher, "Changed")
+            //    // Rx.NET's "Throttle" is really "Debounce". An unfortunate naming mishap.
+            //    .Throttle(TimeSpan.FromMilliseconds(FileChangeWatcherDebounceInterval))
+            //    .Subscribe(this.WatcherOnChanged);
+            //this.watcher.EnableRaisingEvents = true;
 
-
-            this.watcher.EnableRaisingEvents = true;
+            this.fileChangeToken = this.fileProvider.Watch(fileName);
+            this.fileChangeToken.RegisterChangeCallback(this.WatcherOnChanged, default);
             Events.Created(this.configFilePath);
         }
 
@@ -59,23 +62,17 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
             string fileName = Path.GetFileName(path);
 
             DeploymentConfigInfo initial = await ReadFromDisk(path, serde);
-            var watcher = new FileSystemWatcher(directoryName, fileName)
-            {
-                NotifyFilter = NotifyFilters.LastWrite
-            };
+            PhysicalFileProvider fileProvider = new PhysicalFileProvider(directoryName);
 
-            PhysicalFileProvider fileProvider =
-                new PhysicalFileProvider(Directory.GetCurrentDirectory());
-
-            return new FileConfigSource(watcher, initial, configuration, serde);
+            return new FileConfigSource(fileProvider, fileName, initial, configuration, serde);
         }
 
         public Task<DeploymentConfigInfo> GetDeploymentConfigInfoAsync() => Task.FromResult(this.current.Value);
 
         public void Dispose()
         {
-            this.watcherSubscription.Dispose();
-            this.watcher.Dispose();
+            //this.watcherSubscription.Dispose();
+            this.fileProvider.Dispose();
         }
 
         static async Task<DeploymentConfigInfo> ReadFromDisk(string path, ISerde<DeploymentConfigInfo> serde)
@@ -94,10 +91,11 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
             }
         }
 
-        async void WatcherOnChanged(EventPattern<FileSystemEventArgs> args)
+        async void WatcherOnChanged(object state)
+        //async void WatcherOnChanged(EventPattern<FileSystemEventArgs> args)
         {
-            if ((args.EventArgs.ChangeType & WatcherChangeTypes.Changed) != WatcherChangeTypes.Changed)
-                return;
+            //if ((args.EventArgs.ChangeType & WatcherChangeTypes.Changed) != WatcherChangeTypes.Changed)
+            //    return;
 
             try
             {
@@ -110,6 +108,11 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
             catch (Exception ex) when (!ex.IsFatal())
             {
                 Events.NewConfigurationFailed(ex, this.configFilePath);
+            }
+            finally
+            {
+                this.fileChangeToken = this.fileProvider.Watch(Path.GetFileName(this.configFilePath));
+                this.fileChangeToken.RegisterChangeCallback(this.WatcherOnChanged, default);
             }
         }
 
