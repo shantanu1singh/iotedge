@@ -15,23 +15,34 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
 
     public class FileConfigSource : IConfigSource
     {
+        const double FileChangeWatcherDebounceInterval = 500;
+
+        readonly FileSystemWatcher watcher;
         readonly PhysicalFileProvider fileProvider;
         readonly string configFilePath;
+        readonly IDisposable watcherSubscription;
         readonly AtomicReference<DeploymentConfigInfo> current;
         readonly AsyncLock sync;
         readonly ISerde<DeploymentConfigInfo> serde;
         IChangeToken fileChangeToken;
 
-        FileConfigSource(PhysicalFileProvider fileProvider, string fileName, DeploymentConfigInfo initial, IConfiguration configuration, ISerde<DeploymentConfigInfo> serde)
+        FileConfigSource(FileSystemWatcher watcher, PhysicalFileProvider fileProvider, string fileName, DeploymentConfigInfo initial, IConfiguration configuration, ISerde<DeploymentConfigInfo> serde)
         {
-            this.fileProvider = Preconditions.CheckNotNull(fileProvider, nameof(fileProvider));
+            this.watcher = Preconditions.CheckNotNull(watcher, nameof(watcher));
             this.Configuration = Preconditions.CheckNotNull(configuration, nameof(configuration));
             this.current = new AtomicReference<DeploymentConfigInfo>(Preconditions.CheckNotNull(initial, nameof(initial)));
             this.serde = Preconditions.CheckNotNull(serde, nameof(serde));
             this.configFilePath = Path.Combine(fileProvider.Root, fileName);
+            this.fileProvider = Preconditions.CheckNotNull(fileProvider, nameof(fileProvider));
 
             this.sync = new AsyncLock();
-            
+            this.watcherSubscription = Observable
+                .FromEventPattern<FileSystemEventArgs>(this.watcher, "Changed")
+                // Rx.NET's "Throttle" is really "Debounce". An unfortunate naming mishap.
+                .Throttle(TimeSpan.FromMilliseconds(FileChangeWatcherDebounceInterval))
+                .Subscribe(this.WatcherOnChanged);
+            this.watcher.EnableRaisingEvents = true;
+
             this.fileChangeToken = this.fileProvider.Watch(fileName);
             this.fileChangeToken.RegisterChangeCallback(this.WatcherOnChanged, default);
             Events.Created(this.configFilePath);
@@ -39,7 +50,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
 
         public IConfiguration Configuration { get; }
 
-        public static async Task<FileConfigSource> Create(string configFilePath, IConfiguration configuration, ISerde<DeploymentConfigInfo> serde)
+        public static async Task<FileConfigSource> Create(string configFilePath, IConfiguration configuration, ISerde<DeploymentConfigInfo> serde, bool usePollingFileWatcher)
         {
             Preconditions.CheckNotNull(serde, nameof(serde));
             string path = Preconditions.CheckNonWhiteSpace(Path.GetFullPath(configFilePath), nameof(configFilePath));
@@ -52,7 +63,18 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Core.ConfigSources
             string fileName = Path.GetFileName(path);
 
             DeploymentConfigInfo initial = await ReadFromDisk(path, serde);
-            PhysicalFileProvider fileProvider = new PhysicalFileProvider(directoryName);
+
+            if (usePollingFileWatcher)
+            {
+                PhysicalFileProvider fileProvider = new PhysicalFileProvider(directoryName);
+            }
+            else
+            {
+                var watcher = new FileSystemWatcher(directoryName, fileName)
+                {
+                    NotifyFilter = NotifyFilters.LastWrite
+                };
+            }
 
             return new FileConfigSource(fileProvider, fileName, initial, configuration, serde);
         }
