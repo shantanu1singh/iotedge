@@ -3,7 +3,7 @@ ARG num_procs=4
 
 # FROM mcr.microsoft.com/dotnet/core/runtime:${base_tag}
 
-ARG base_tag=3.0-alpine3.10-arm64v8
+ARG base_tag=3.1.0-alpine3.10-arm64v8
 FROM mcr.microsoft.com/dotnet/core/runtime:${base_tag}
 
 # RUN mkdir -p ../publish

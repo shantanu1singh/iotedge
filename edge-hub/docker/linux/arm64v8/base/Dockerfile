@@ -21,7 +21,7 @@
 # # we are starting edge hub as a non-root user
 # RUN setcap 'cap_net_bind_service=+ep' /usr/share/dotnet/dotnet
 
-ARG base_tag=3.0-alpine3.10-arm64v8
+ARG base_tag=3.1.0-alpine3.10-arm64v8
 FROM mcr.microsoft.com/dotnet/core/runtime:${base_tag}
 
 RUN apk update && \
