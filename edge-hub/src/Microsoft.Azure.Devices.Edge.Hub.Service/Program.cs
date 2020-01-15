@@ -3,6 +3,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Security.Authentication;
     using System.Threading;
     using System.Threading.Tasks;
@@ -40,6 +41,12 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
 
         static async Task<int> MainAsync(IConfigurationRoot configuration)
         {
+            ThreadPool.GetMaxThreads(out int originalMaxWorkerThreadCount, out int originalMaxCompletionPortThreadCount);
+            ThreadPool.GetMaxThreads(out int originalMinWorkerThreadCount, out int originalMinCompletionPortThreadCount);
+
+            int maxThreadCount = configuration.GetValue<int>("MaxThreadCount", 4);
+            ThreadPool.SetMaxThreads(maxThreadCount, maxThreadCount);
+
             string logLevel = configuration.GetValue($"{Logger.RuntimeLogLevelEnvKey}", "info");
             Logger.SetLogLevel(logLevel);
 
@@ -50,6 +57,9 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             }
 
             ILogger logger = Logger.Factory.CreateLogger("EdgeHub");
+            logger.LogInformation($"Original Min {originalMaxWorkerThreadCount} {originalMaxCompletionPortThreadCount}.");
+            logger.LogInformation($"Original Max {originalMinWorkerThreadCount} {originalMinCompletionPortThreadCount}.");
+            logger.LogInformation($"Number of threads {Process.GetCurrentProcess().Threads.Count}.");
 
             EdgeHubCertificates certificates = await EdgeHubCertificates.LoadAsync(configuration, logger);
             bool clientCertAuthEnabled = configuration.GetValue(Constants.ConfigKey.EdgeHubClientCertAuthEnabled, false);

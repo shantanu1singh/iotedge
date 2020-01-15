@@ -3,6 +3,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.IO;
     using System.Linq;
     using System.Net;
@@ -61,10 +62,19 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
 
         public static async Task<int> MainAsync(IConfiguration configuration)
         {
+            ThreadPool.GetMaxThreads(out int originalMaxWorkerThreadCount, out int originalMaxCompletionPortThreadCount);
+            ThreadPool.GetMaxThreads(out int originalMinWorkerThreadCount, out int originalMinCompletionPortThreadCount);
+
+            int maxThreadCount = configuration.GetValue<int>("MaxThreadCount", 4);
+            ThreadPool.SetMaxThreads(maxThreadCount, maxThreadCount);
+
             // Bring up the logger before anything else so we can log errors ASAP
             ILogger logger = SetupLogger(configuration);
 
             logger.LogInformation("Initializing Edge Agent.");
+            logger.LogInformation($"Original Min {originalMaxWorkerThreadCount} {originalMaxCompletionPortThreadCount}.");
+            logger.LogInformation($"Original Max {originalMinWorkerThreadCount} {originalMinCompletionPortThreadCount}.");
+            logger.LogInformation($"Number of threads {Process.GetCurrentProcess().Threads.Count}.");
 
             VersionInfo versionInfo = VersionInfo.Get(VersionInfoFileName);
             if (versionInfo != VersionInfo.Empty)
