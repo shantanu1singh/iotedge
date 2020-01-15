@@ -45,6 +45,7 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             ThreadPool.GetMaxThreads(out int originalMinWorkerThreadCount, out int originalMinCompletionPortThreadCount);
 
             int maxThreadCount = configuration.GetValue<int>("MaxThreadCount", 4);
+            ThreadPool.SetMinThreads(maxThreadCount, maxThreadCount);
             ThreadPool.SetMaxThreads(maxThreadCount, maxThreadCount);
 
             string logLevel = configuration.GetValue($"{Logger.RuntimeLogLevelEnvKey}", "info");
@@ -59,6 +60,12 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             ILogger logger = Logger.Factory.CreateLogger("EdgeHub");
             logger.LogInformation($"Original Min {originalMaxWorkerThreadCount} {originalMaxCompletionPortThreadCount}.");
             logger.LogInformation($"Original Max {originalMinWorkerThreadCount} {originalMinCompletionPortThreadCount}.");
+
+            ThreadPool.GetMaxThreads(out originalMaxWorkerThreadCount, out originalMaxCompletionPortThreadCount);
+            ThreadPool.GetMaxThreads(out originalMinWorkerThreadCount, out originalMinCompletionPortThreadCount);
+            logger.LogInformation($"Original Min {originalMaxWorkerThreadCount} {originalMaxCompletionPortThreadCount}.");
+            logger.LogInformation($"Original Max {originalMinWorkerThreadCount} {originalMinCompletionPortThreadCount}.");
+
             logger.LogInformation($"Number of threads {Process.GetCurrentProcess().Threads.Count}.");
 
             EdgeHubCertificates certificates = await EdgeHubCertificates.LoadAsync(configuration, logger);
