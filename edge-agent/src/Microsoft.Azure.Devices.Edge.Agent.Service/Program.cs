@@ -24,12 +24,14 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
     using Microsoft.Azure.Devices.Edge.Storage;
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Azure.Devices.Edge.Util.Metrics;
+    using Microsoft.Diagnostics.Runtime;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Logging;
     using Constants = Microsoft.Azure.Devices.Edge.Agent.Core.Constants;
     using K8sConstants = Microsoft.Azure.Devices.Edge.Agent.Kubernetes.Constants;
     using KubernetesModule = Microsoft.Azure.Devices.Edge.Agent.Service.Modules.KubernetesModule;
     using MetricsListener = Microsoft.Azure.Devices.Edge.Util.Metrics.Prometheus.Net.MetricsListener;
+    using VersionInfo = Microsoft.Azure.Devices.Edge.Util.VersionInfo;
 
     public class Program
     {
@@ -82,6 +84,25 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
             logger.LogInformation($"Original Max {originalMinWorkerThreadCount} {originalMinCompletionPortThreadCount}.");
 
             logger.LogInformation($"Number of threads {Process.GetCurrentProcess().Threads.Count}.");
+
+            using (DataTarget target = DataTarget.AttachToProcess(
+                Process.GetCurrentProcess().Id, 5000, AttachFlag.Passive))
+            {
+                ClrRuntime runtime = target.ClrVersions.First().CreateRuntime();
+                foreach (ClrThread thread in runtime.Threads)
+                {
+                    logger.LogInformation($"Thread {thread.ManagedThreadId}, IsThreadpoolCompletionPort: {thread.IsThreadpoolCompletionPort}"
+                        + $", IsThreadpoolWorker: {thread.IsThreadpoolWorker}"
+                        + $", IsThreadpoolGate: {thread.IsThreadpoolGate}"
+                        + $", IsThreadpoolTimer: {thread.IsThreadpoolTimer}"
+                        + $", IsThreadpoolWait: {thread.IsThreadpoolWait}"
+                        + $", IsAborted: {thread.IsAborted}"
+                        + $", IsAlive: {thread.IsAlive}"
+                        + $", IsBackground: {thread.IsBackground}"
+                        + $", IsGC: {thread.IsGC}"
+                        + $", IsUnstarted: {thread.IsUnstarted}");
+                }
+            }
 
             VersionInfo versionInfo = VersionInfo.Get(VersionInfoFileName);
             if (versionInfo != VersionInfo.Empty)

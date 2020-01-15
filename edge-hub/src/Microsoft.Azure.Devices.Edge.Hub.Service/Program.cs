@@ -21,7 +21,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
     using Microsoft.Azure.Devices.Edge.Util;
     using Microsoft.Azure.Devices.Edge.Util.Metrics;
     using Microsoft.Azure.Devices.Routing.Core;
-    using Microsoft.Diagnostics.Runtime;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Logging;
     using VersionInfo = Microsoft.Azure.Devices.Edge.Util.VersionInfo;
@@ -70,25 +69,6 @@ namespace Microsoft.Azure.Devices.Edge.Hub.Service
             logger.LogInformation($"Original Max {originalMinWorkerThreadCount} {originalMinCompletionPortThreadCount}.");
 
             logger.LogInformation($"Number of threads {Process.GetCurrentProcess().Threads.Count}.");
-
-            using (DataTarget target = DataTarget.AttachToProcess(
-                Process.GetCurrentProcess().Id, 5000, AttachFlag.Passive))
-            {
-                ClrRuntime runtime = target.ClrVersions.First().CreateRuntime();
-                foreach (ClrThread thread in runtime.Threads)
-                {
-                    logger.LogInformation($"Thread {thread.ManagedThreadId}, IsThreadpoolCompletionPort: {thread.IsThreadpoolCompletionPort}"
-                        + $", IsThreadpoolWorker: {thread.IsThreadpoolWorker}"
-                        + $", IsThreadpoolGate: {thread.IsThreadpoolGate}"
-                        + $", IsThreadpoolTimer: {thread.IsThreadpoolTimer}"
-                        + $", IsThreadpoolWait: {thread.IsThreadpoolWait}"
-                        + $", IsAborted: {thread.IsAborted}"
-                        + $", IsAlive: {thread.IsAlive}"
-                        + $", IsBackground: {thread.IsBackground}"
-                        + $", IsGC: {thread.IsGC}"
-                        + $", IsUnstarted: {thread.IsUnstarted}");
-                }
-            }
 
             EdgeHubCertificates certificates = await EdgeHubCertificates.LoadAsync(configuration, logger);
             bool clientCertAuthEnabled = configuration.GetValue(Constants.ConfigKey.EdgeHubClientCertAuthEnabled, false);
