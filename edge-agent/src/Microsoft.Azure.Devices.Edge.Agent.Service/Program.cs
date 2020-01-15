@@ -67,7 +67,7 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
             ThreadPool.GetMaxThreads(out int originalMaxWorkerThreadCount, out int originalMaxCompletionPortThreadCount);
             ThreadPool.GetMaxThreads(out int originalMinWorkerThreadCount, out int originalMinCompletionPortThreadCount);
 
-            int maxThreadCount = configuration.GetValue<int>("MaxThreadCount", 4);
+            int maxThreadCount = configuration.GetValue<int>("MaxThreadCount", 1);
             ThreadPool.SetMinThreads(maxThreadCount, maxThreadCount);
             ThreadPool.SetMaxThreads(maxThreadCount, maxThreadCount);
 
@@ -85,21 +85,19 @@ namespace Microsoft.Azure.Devices.Edge.Agent.Service
 
             logger.LogInformation($"Number of threads {Process.GetCurrentProcess().Threads.Count}.");
 
-            using (DataTarget target = DataTarget.AttachToProcess(
-                Process.GetCurrentProcess().Id, 5000, AttachFlag.Passive))
+            using (DataTarget target = DataTarget.PassiveAttachToProcess(
+                Process.GetCurrentProcess().Id))
             {
                 ClrRuntime runtime = target.ClrVersions.First().CreateRuntime();
                 foreach (ClrThread thread in runtime.Threads)
                 {
-                    logger.LogInformation($"Thread {thread.ManagedThreadId}, IsThreadpoolCompletionPort: {thread.IsThreadpoolCompletionPort}"
-                        + $", IsThreadpoolWorker: {thread.IsThreadpoolWorker}"
-                        + $", IsThreadpoolGate: {thread.IsThreadpoolGate}"
-                        + $", IsThreadpoolTimer: {thread.IsThreadpoolTimer}"
-                        + $", IsThreadpoolWait: {thread.IsThreadpoolWait}"
+                    logger.LogInformation($"Thread {thread.ManagedThreadId}, StackBase: {thread.StackBase}"
+                        + $", IsUserSuspended: {thread.IsUserSuspended}"
+                        + $", IsMTA: {thread.IsMTA}"
+                        + $", IsSTA: {thread.IsSTA}"
                         + $", IsAborted: {thread.IsAborted}"
                         + $", IsAlive: {thread.IsAlive}"
                         + $", IsBackground: {thread.IsBackground}"
-                        + $", IsGC: {thread.IsGC}"
                         + $", IsUnstarted: {thread.IsUnstarted}");
                 }
             }
